@@ -162,6 +162,15 @@ def main(argv: list[str] | None = None) -> int:
             "price_basis_warning": price_basis_warning,
             "no_future_data_used": True,  # enforced by AsOfDataProvider's query-level cutoff, not
                                             # merely asserted — see data/asof_provider.py
+            # v1.3 audit finding (same gap as run_daily.py / run_scan.py, fixed the same way
+            # here): computed on `result` but was previously dropped before reaching the
+            # manifest. No data_file_hash here — replay never ingests, it only reads.
+            "benchmark_status": result.benchmark_status,
+            "data_validation_failures": result.data_validation_failures,
+            "insufficient_history_count": result.insufficient_history_count,
+            "security_scan_failures": result.security_scan_failures,
+            "signals_current": result.signals_current,
+            "signals_stale": result.signals_stale,
         },
     )
     manifest_path = reports_dir / f"run_manifest_replay_{session.expected_completed_session.isoformat()}.json"

@@ -82,6 +82,18 @@ def main(argv: list[str] | None = None) -> int:
         expected_session=session.expected_completed_session.isoformat(),
         signal_date=session.signal_date.isoformat(), status=result.run_health,
         price_basis=result.price_basis,
+        # See run_daily.py for why these are here (v1.3 audit finding: computed but previously
+        # dropped before reaching the manifest). No ingestion happens in this entry point, so no
+        # data_file_hash field here — that's specific to run_daily.py's ingest step.
+        extra={
+            "benchmark_status": result.benchmark_status,
+            "data_validation_failures": result.data_validation_failures,
+            "insufficient_history_count": result.insufficient_history_count,
+            "security_scan_failures": result.security_scan_failures,
+            "signals_current": result.signals_current,
+            "signals_stale": result.signals_stale,
+            "needs_bootstrap": result.needs_bootstrap,
+        },
     )
     manifest.write(Path(cfg.paths.reports_dir) / f"run_manifest_{session.signal_date.isoformat()}.json")
 

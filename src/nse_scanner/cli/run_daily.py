@@ -155,6 +155,21 @@ def main(argv: list[str] | None = None) -> int:
         expected_session=session.expected_completed_session.isoformat(),
         signal_date=session.signal_date.isoformat(), status=result.run_health,
         price_basis=result.price_basis,
+        # PART 54 requires the manifest (the machine-readable record) to carry these — they were
+        # already being computed (ScanRunResult / IngestionResult) and printed to the console
+        # below, but previously silently dropped rather than written to run_manifest_*.json.
+        # Found + fixed during the v1.3 research-integrity audit.
+        extra={
+            "data_file_hash": ingestion_result.file_hash if not args.skip_ingest else None,
+            "data_file_path": ingestion_result.raw_file_path if not args.skip_ingest else None,
+            "benchmark_status": result.benchmark_status,
+            "data_validation_failures": result.data_validation_failures,
+            "insufficient_history_count": result.insufficient_history_count,
+            "security_scan_failures": result.security_scan_failures,
+            "signals_current": result.signals_current,
+            "signals_stale": result.signals_stale,
+            "needs_bootstrap": result.needs_bootstrap,
+        },
     )
     manifest_path = Path(cfg.paths.reports_dir) / f"run_manifest_{session.signal_date.isoformat()}.json"
     manifest.write(manifest_path)

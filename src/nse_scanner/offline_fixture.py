@@ -110,7 +110,18 @@ def run_offline_fixture_scan(cfg: ScannerConfig, session: SessionInfo, store: Ma
         constituent_count=result.constituent_count, data_provider=data_provider.name,
         data_as_of=last_date.date().isoformat(), expected_session=last_date.date().isoformat(),
         signal_date=last_date.date().isoformat(), status=result.run_health,
-        extra={"mode": "OFFLINE_FIXTURE", "note": "synthetic data, not real NSE data"},
+        price_basis=result.price_basis,  # was omitted; fell back to cfg default instead of the
+                                          # actual basis the (synthetic) provider returned
+        # See cli/run_daily.py for why these are here (v1.3 audit finding).
+        extra={
+            "mode": "OFFLINE_FIXTURE", "note": "synthetic data, not real NSE data",
+            "benchmark_status": result.benchmark_status,
+            "data_validation_failures": result.data_validation_failures,
+            "insufficient_history_count": result.insufficient_history_count,
+            "security_scan_failures": result.security_scan_failures,
+            "signals_current": result.signals_current,
+            "signals_stale": result.signals_stale,
+        },
     )
     manifest_path = Path(cfg.paths.reports_dir) / "run_manifest_OFFLINE_FIXTURE.json"
     manifest.write(manifest_path)
