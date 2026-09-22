@@ -1,0 +1,17 @@
+# Default configuration overrides. Every value here is optional — anything omitted falls back
+# to the typed default in src/nse_scanner/config.py. Sections/keys must match the dataclass
+# field names exactly (see config.py's *_SECTION_MAP and each dataclass).
+#
+# This file intentionally leaves everything at its built-in default; it exists as a documented
+# starting point to copy/edit, not because any override is required to run the scanner.
+
+# universe:
+#   universe_scope: "NIFTY_200"
+
+# filters:
+#   use_trend_filter: false
+#   use_volume_filter: false
+
+# research:
+#   run_research_mode: false
+#   entry_price_method: "next_open"

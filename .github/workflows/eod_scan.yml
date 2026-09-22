@@ -1,0 +1,63 @@
+name: EOD Scan
+
+# Separate from ci.yml on purpose (PART 57): normal code CI must never depend on live NSE
+# availability, but this workflow's entire job IS to talk to NSE. It is safe to schedule, but
+# ships here as workflow_dispatch-only by default — enable the schedule trigger once you've
+# confirmed data/nse_eod.py and data/nse_reports.py work against real NSE endpoints from a
+# GitHub-hosted runner's IP range (this repository's own build sandbox could not reach
+# nseindia.com at all — see README "Known limitations" — so this workflow is UNVERIFIED end
+# to end and should be treated as a starting point, not a proven pipeline).
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Force a specific session date (YYYY-MM-DD). Leave blank for automatic."
+        required: false
+        type: string
+  # schedule:
+  #   # 18:00 IST = 12:30 UTC, well after the 15:30 IST close. Uncomment once verified.
+  #   - cron: "30 12 * * 1-5"
+
+jobs:
+  eod-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install package
+        run: pip install -e .
+
+      - name: Run daily EOD scan
+        run: |
+          if [ -n "${{ github.event.inputs.date }}" ]; then
+            python scripts/run_daily.py --date "${{ github.event.inputs.date }}"
+          else
+            python scripts/run_daily.py
+          fi
+        # Exit code 2 = WAITING_FOR_EOD_DATA (not yet published — not a workflow failure in the
+        # traditional sense, but we still want the run marked non-green so it's visible).
+        # Exit code 3 = universe integrity failure — must fail loudly, never silently produce a
+        # partial-universe report (PART 6 / PART 57 "fail loudly on integrity violations").
+
+      - name: Upload report + manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eod-scan-report
+          path: |
+            reports/*.xlsx
+            reports/*.json
+          retention-days: 90
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eod-scan-logs
+          path: logs/*
+          retention-days: 30

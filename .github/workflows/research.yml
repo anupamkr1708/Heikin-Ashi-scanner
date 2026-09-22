@@ -1,0 +1,43 @@
+name: Research
+
+# Manually triggered only (PART 58: "Do NOT run enormous historical research on every push").
+# Requires the local DuckDB/Parquet store to already have multiple sessions of history ingested
+# (this workflow does not ingest data itself) — in a GitHub-hosted runner that means either
+# committing a data snapshot artifact from a previous eod_scan.yml run, or restoring one via
+# actions/download-artifact before this step. That wiring is left to the user since it depends
+# on how much history they want available in CI (PART 59: CI artifacts are not the permanent
+# historical datastore).
+on:
+  workflow_dispatch:
+    inputs:
+      horizon:
+        description: "Primary forward-return horizon in trading days"
+        required: false
+        type: string
+        default: "5"
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install package
+        run: pip install -e .
+
+      - name: Run event-study research
+        run: python scripts/run_research.py --horizon "${{ github.event.inputs.horizon }}"
+
+      - name: Upload research outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-report
+          path: |
+            reports/research_events.csv
+          retention-days: 90

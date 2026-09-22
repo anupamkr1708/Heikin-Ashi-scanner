@@ -1,0 +1,11 @@
+# Explicit, versioned NSE-symbol -> Yahoo-Finance-base-symbol overrides.
+#
+# Most NSE symbols map to Yahoo as "<SYMBOL>.NS" directly (see
+# universe/symbol_mapping.py::map_symbol_to_yfinance). Add an entry here ONLY when a symbol is
+# known to need something else, and record why. This file — not a dict buried in code — is the
+# architecture for those exceptions (PART 4).
+overrides:
+  "M&M": "M&M"
+  "M&MFIN": "M&MFIN"
+  "L&TFH": "L&TFH"
+  "BAJAJ-AUTO": "BAJAJ-AUTO"

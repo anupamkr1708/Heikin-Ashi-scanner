@@ -1,0 +1,33 @@
+# NSE trading-holiday calendar.
+#
+# PROVENANCE OF THE 2026 ENTRY BELOW: this repository's own build/test sandbox has no network
+# path to nseindia.com, so the standard fixed-date national holidays (Republic Day, Independence
+# Day, Gandhi Jayanti, Christmas) are included as a documented convenience default — NSE has
+# historically observed these every year, but a fixed date can still shift if it falls on a
+# weekend or is locally adjusted, so verify before relying on it. The 2026-09-14 entry is
+# EXPLICITLY USER-SUPPLIED: the maintainer, who has run this system against real live NSE data,
+# stated it directly as a fact ("2026-09-14 Monday is an NSE holiday") rather than this being a
+# guess made by the assistant that built this repository — see PART 6/PART 15's prohibition on
+# fabricated calendar data, which this respects by recording provenance rather than inventing a
+# date. NSE's lunar-calendar festival holidays (Diwali, Holi, Eid, Ganesh Chaturthi, etc.) for
+# 2026 are NOT included below and remain unverified — this file is a PARTIAL list, not a complete
+# transcription of the official circular.
+#
+# BEFORE relying on this for a production ingestion/scan across the full year:
+#   1. Fetch the complete official list from:
+#      https://www.nseindia.com/resources/exchange-communication-holidays
+#   2. Replace/extend the 2026 entry below with the complete, verified list.
+#
+# data/calendar.py::resolve_holidays_for_run() blocks (in strict/production mode) rather than
+# silently treating an unlisted year as holiday-free, so a missing YEAR fails loudly — but a
+# missing individual DATE within a covered year does not (this file's completeness within a
+# covered year is not separately verified by code, only by you).
+holidays:
+  2026:
+    - "2026-01-26"   # Republic Day (fixed-date convenience default — verify)
+    - "2026-08-15"   # Independence Day (fixed-date convenience default — verify)
+    - "2026-09-14"   # USER-SUPPLIED: stated directly by the maintainer as an NSE holiday
+    - "2026-10-02"   # Gandhi Jayanti (fixed-date convenience default — verify)
+    - "2026-12-25"   # Christmas (fixed-date convenience default — verify)
+    # Diwali/Laxmi Pujan, Holi, Eid, Ganesh Chaturthi, and other lunar-calendar festival
+    # holidays for 2026 are NOT yet included — add them from the official circular.
