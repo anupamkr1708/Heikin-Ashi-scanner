@@ -1,5 +1,70 @@
 # Changelog
 
+## 1.3.0 — v1.3 research-integrity audit: benchmark as-of leak, calendar, manifest provenance
+
+An external forensic audit against the full v1.3 research-integrity specification (P0 items:
+full codebase audit, as-of replay verification, future-data invariance, benchmark
+normalization, calendar correctness, data provenance). Findings and fixes below; see the audit
+report delivered alongside this release for the full PASS/WARN/FAIL table and what remains
+unverified.
+
+- **Fixed (highest-severity finding):** `data/benchmark.py::YahooBenchmarkProvider` always
+  called `yf.download(period=...)` with no upper date bound, regardless of caller.
+  `run_replay.py --as-of <past date>` used it unmodified, so a historical replay's
+  `Market_Regime`/`RS_20D`/`RS_60D`/`RS_120D` columns were computed from TODAY's live benchmark
+  data, not from what was actually available by the close of the replayed date — the exact
+  violation the `AsOfDataProvider` mechanism exists to prevent for stock data. Concrete
+  symptom: the Market_Regime sheet's `Index_Close` in a historical replay was silently today's
+  live index bar, not the replayed date's. `YahooBenchmarkProvider` now takes an `as_of_date`,
+  enforced at two independent layers (request `end=` param, response-layer post-filter),
+  mirroring `MarketDataStore`'s SQL cutoff. Disclosed residual limitation: this does not protect
+  against a provider retroactively revising an already-published adjusted close — the benchmark
+  path is not locally frozen the way stock history is. 13 new tests (11 direct unit tests for a
+  provider that previously had zero, 2 pipeline-level future-append-invariance tests).
+
+- **Fixed:** `config/nse_holidays.yaml`'s 2026 entry was a disclosed-as-partial 5-date
+  convenience default (this repository's original build sandbox had no network path to
+  nseindia.com). Replaced with the verified official NSE circular (Download Ref No.
+  NSE/CMTR/71775, 15 dates) plus one ad-hoc modification found during verification
+  (2026-01-15, Maharashtra municipal elections — corroborated by multiple independent
+  contemporary news reports; NOT in the primary annual circular, added via a later
+  modification). 16 dates total, each independently sourced and commented. Also removed a
+  dead constant (`_FIXED_DATE_HOLIDAYS_MMDD`, defined, zero call sites) that the old module
+  docstring implied was in use.
+
+- **Fixed:** `run_manifest_*.json` (the machine-readable, reproducible run record — PART 54)
+  was missing `benchmark_status`, data-quality counts, scan/signal counts, and (for
+  `run_daily.py`) the ingested file's SHA256 hash, across all four places a manifest gets
+  built. Every one of these values was already computed and printed to the console —
+  `IngestionResult.file_hash` in particular was computed, returned, and then discarded without
+  ever being printed OR persisted. Now threaded through via `build_run_manifest`'s `extra=`
+  field at all four call sites. Also fixed `offline_fixture.py` omitting `price_basis` entirely
+  (silently falling back to the config default instead of the actual basis returned).
+
+- **Fixed:** `ruff`/`mypy` were not actually clean despite `CODE_REVIEW.md` claiming so — a
+  trailing-newline `W292` in `config.py` and a missing `types-python-dateutil` mypy stub. Both
+  fixed; both tools now genuinely clean.
+
+- **Fixed:** version mismatch — `pyproject.toml` said `1.2.2`, `version.py`'s `__version__`
+  (what actually ends up in the run manifest's `software_version` field) said `1.2.0`. Both now
+  `1.3.0`.
+
+- **Confirmed correct (traced, not just read):** `AsOfDataProvider` → `MarketDataStore`'s SQL
+  `trade_date <= ?` cutoff for stock data is a genuine query-level guarantee, not just
+  documentation. Universe point-in-time handling (`research/survivorship.py`) is honestly
+  labeled `CURRENT_UNIVERSE_HISTORICAL_SIMULATION` with `SURVIVORSHIP_BIAS_PRESENT = True`
+  rather than claiming true point-in-time membership it doesn't have.
+
+- **Found, not yet fixed (documented in the audit report, not silently dropped):**
+  `data/provenance.py::ProvenanceRecord` is a well-designed dataclass matching PART 23's field
+  list closely, but has zero call sites anywhere in the codebase — aspirational/dead code, not
+  a wired-up mechanism. Per-row provenance in the actual `eod_prices` table covers `source`,
+  `price_basis`, `schema_version`, `ingested_at` but not `source_file_hash`/`ingestion_run_id`
+  as explicit columns (traceable back to the raw file only via the `trade_date`-based naming
+  convention, not an explicit link).
+
+162 tests passing (was 145 at the start of this audit), `ruff`/`mypy` clean.
+
 ## 1.2.2 — yfinance repair disabled by default (2nd missing-dependency hit)
 
 The 1.2.1 fix addressed `scipy`; the very next bootstrap run hit a DIFFERENT missing dependency
