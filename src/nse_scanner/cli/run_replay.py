@@ -9,6 +9,13 @@ appends. It only reads what's already locally stored, through the `AsOfDataProvi
 (`data/asof_provider.py`), which makes it structurally impossible for this command to use any
 observation dated after `--as-of` — not a documentation promise, an enforced query filter.
 
+The benchmark path (`data/benchmark.py::YahooBenchmarkProvider`) is given the same `as_of_date`
+cutoff here, enforced at both the request and response layer, so `Market_Regime`/`RS_*` columns
+also cannot see benchmark sessions after `--as-of`. This DOES still reach the live network (the
+benchmark series is not locally stored/frozen the way stock history is) — see that module's
+docstring for the specific, disclosed residual limitation this leaves (provider-side historical
+price revision, as distinct from future SESSIONS, which are excluded).
+
 **Universe caveat, stated up front, not buried:** this repository has no verified point-in-time
 NIFTY-200-membership feed. This command uses TODAY's constituent list applied to the historical
 date (`research/survivorship.py::label_current_universe_mode()`), and the report is labeled
@@ -100,7 +107,10 @@ def main(argv: list[str] | None = None) -> int:
 
     store = MarketDataStore(cfg.paths.processed_dir, cfg.paths.duckdb_path)
     data_provider = AsOfDataProvider(as_of_date=session.expected_completed_session, store=store)
-    benchmark_provider = YahooBenchmarkProvider(cfg.data)  # best-effort; replay works without it
+    # as_of_date is required here, not optional: without it this provider would fetch today's
+    # live benchmark data into a historical replay (see data/benchmark.py module docstring for
+    # the gap this closes). best-effort beyond that — replay still works without a benchmark.
+    benchmark_provider = YahooBenchmarkProvider(cfg.data, as_of_date=session.expected_completed_session)
 
     try:
         result = run_scan(cfg, universe_provider, data_provider, benchmark_provider, session, holidays,
