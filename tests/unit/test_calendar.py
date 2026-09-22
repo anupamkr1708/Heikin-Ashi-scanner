@@ -97,3 +97,54 @@ def test_2026_09_11_next_session_skips_the_09_14_holiday():
     next_session = next_trading_day(friday, holidays_2026)
     assert next_session == date(2026, 9, 15)
     assert next_session != date(2026, 9, 14)
+
+
+def test_2026_holiday_calendar_matches_the_verified_official_circular():
+    """v1.3 research-integrity audit regression: config/nse_holidays.yaml's 2026 entry now comes
+    from the real NSE circular (Download Ref No. NSE/CMTR/71775, Circular Ref. No. 172/2025, dated
+    2025-12-12), fetched and cross-checked directly, PLUS one ad-hoc modification circular
+    (2026-01-15, Maharashtra municipal elections, added 2026-01-12) — replacing the prior
+    partial/best-effort 5-date list this repository's original network-isolated build sandbox was
+    limited to. This test pins the full 16-date set so a future accidental edit of the YAML file
+    is caught, and documents the exact source for each date (see the YAML file's own comments for
+    the full provenance narrative)."""
+    from nse_scanner.data.calendar import load_holiday_set
+
+    holidays_2026 = load_holiday_set("config/nse_holidays.yaml", {2026})
+
+    expected = {
+        date(2026, 1, 15),   # ad-hoc: Maharashtra municipal elections (modification circular)
+        date(2026, 1, 26),   # Republic Day
+        date(2026, 3, 3),    # Holi
+        date(2026, 3, 26),   # Shri Ram Navami
+        date(2026, 3, 31),   # Shri Mahavir Jayanti
+        date(2026, 4, 3),    # Good Friday
+        date(2026, 4, 14),   # Dr. Baba Saheb Ambedkar Jayanti
+        date(2026, 5, 1),    # Maharashtra Day
+        date(2026, 5, 28),   # Bakri Id
+        date(2026, 6, 26),   # Muharram
+        date(2026, 9, 14),   # Ganesh Chaturthi
+        date(2026, 10, 2),   # Mahatma Gandhi Jayanti
+        date(2026, 10, 20),  # Dussehra
+        date(2026, 11, 10),  # Diwali-Balipratipada
+        date(2026, 11, 24),  # Prakash Gurpurb Sri Guru Nanak Dev
+        date(2026, 12, 25),  # Christmas
+    }
+    assert holidays_2026 == expected
+    assert len(holidays_2026) == 16
+
+
+def test_2026_01_15_maharashtra_election_holiday_is_honored():
+    """The ad-hoc addition specifically: 2026-01-15 is a Thursday and would otherwise look like an
+    ordinary trading day to a weekday-only or annual-circular-only calendar."""
+    from nse_scanner.data.calendar import load_holiday_set
+
+    holidays_2026 = load_holiday_set("config/nse_holidays.yaml", {2026})
+    election_holiday = date(2026, 1, 15)
+    assert election_holiday.weekday() == 3  # Thursday — not already a weekend
+    assert not is_trading_day(election_holiday, holidays_2026)
+
+    wednesday = date(2026, 1, 14)
+    next_session = next_trading_day(wednesday, holidays_2026)
+    assert next_session == date(2026, 1, 16)  # Friday — skips the Thursday election holiday
+    assert next_session != date(2026, 1, 15)
