@@ -44,6 +44,18 @@ date, run months apart, are not guaranteed byte-identical for benchmark-derived 
 they are guaranteed identical for the baseline BB+HA signal itself (which never depends on the
 benchmark). This is a known, disclosed gap — see CODE_REVIEW.md — not a claim that the benchmark
 path is fully point-in-time; only that it no longer leaks entire FUTURE SESSIONS into a replay.
+**P1 provider-hardening note (this revision):** a REAL production run against live yfinance 1.7.0
+hit exactly the failure the module docstring above warned was possible: `yf.download("^NSEI",
+group_by="ticker", ...)` returned a MultiIndex oriented `(Ticker, Price)` —
+`level 0 = '^NSEI'`, `level 1 = 'Open'/'High'/...` — the OPPOSITE of what the previous
+`df.columns.get_level_values(0)` collapse assumed, which produced five columns all literally named
+`'^NSEI'` and the resulting "unexpected benchmark schema, missing column" failure. Fixed by
+replacing the position-based collapse with `data/normalization.py::normalize_ticker_frame`, which
+determines the field level FROM ITS VALUES (does it look like OHLCV field names?), not from
+position, and works for both `(ticker, field)` and `(field, ticker)` orientations — see that
+function's docstring for the full algorithm. `Volume` is now explicitly optional (confirmed by
+inspection that nothing downstream reads it from the benchmark frame) and zero-volume index
+sessions are no longer conflated with missing/invalid data.
 """
 
 from __future__ import annotations
@@ -55,7 +67,8 @@ import pandas as pd
 
 from nse_scanner.config import DataConfig
 from nse_scanner.data.base import BenchmarkProvider
-from nse_scanner.data.normalization import normalize_ohlcv_columns
+from nse_scanner.data.normalization import normalize_ticker_frame
+from nse_scanner.exceptions import FrameNormalizationError
 from nse_scanner.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -102,22 +115,10 @@ class YahooBenchmarkProvider(BenchmarkProvider):
         except Exception as e:  # noqa: BLE001 - network/provider call
             return None, f"{type(e).__name__}: {e}"
 
-        if raw is None or raw.empty:
-            return None, "no_data_returned"
-
-        df = raw.copy()
-        if isinstance(df.columns, pd.MultiIndex):
-            # A single-ticker call can still come back with a (field, ticker) MultiIndex
-            # depending on yfinance version/group_by — collapse to the field level explicitly,
-            # never assume it matches the stock-downloader shape (BUG 3).
-            df.columns = df.columns.get_level_values(0)
         try:
-            df = normalize_ohlcv_columns(df)
-        except KeyError as e:
-            return None, f"unexpected benchmark schema, missing column: {e}"
-
-        if df.empty:
-            return None, "no_data_returned"
+            df = normalize_ticker_frame(raw, ticker)
+        except FrameNormalizationError as e:
+            return None, str(e)
 
         if self.as_of_date is not None:
             # Response layer (defense in depth — see module docstring): unconditionally drop any

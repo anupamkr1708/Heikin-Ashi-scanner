@@ -29,6 +29,15 @@ class DataValidationError(NseScannerError):
     """Raised when OHLCV data fails schema or sanity validation."""
 
 
+class FrameNormalizationError(DataValidationError):
+    """Raised by data/normalization.py when a raw provider dataframe (yfinance or otherwise)
+    cannot be normalized to the canonical OHLCV shape — unrecognized MultiIndex orientation,
+    a requested ticker missing from a multi-ticker frame, missing required fields after
+    normalization, or no usable rows remaining. Always carries a specific, actionable message
+    (which level/values were seen) rather than a bare KeyError — see PART 59: no error may be
+    vague about what failed, where, or what was expected vs observed."""
+
+
 class SymbolMappingError(NseScannerError):
     """Raised when a security cannot be mapped between identity systems (ISIN/NSE/Yahoo)."""
 
