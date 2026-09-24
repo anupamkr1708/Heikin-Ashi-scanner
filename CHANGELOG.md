@@ -1,5 +1,55 @@
 # Changelog
 
+## 1.3.2 — daily/run_scan benchmark as-of binding + security-master provenance fix
+
+Two independently forensically-verified research-integrity fixes (see
+`DAILY_ASOF_PROVENANCE_HARDENING_NOTES.md` for the full audit trail). Scope deliberately excludes
+the still-unresolved `NSE_MAINBOARD_EQ` universe predicate (EQ/BE, DelFlg, PrtdToTrad,
+ElgbltyNrmlMkt, SctyStsNrmlMkt, ETF identification) — those remain open, tracked separately, and
+are NOT implemented in this release.
+
+- **Fixed: daily/`run_scan` benchmark as-of binding.** `cli/run_daily.py` and `cli/run_scan.py`
+  constructed `YahooBenchmarkProvider(cfg.data)` with no `as_of_date`, unlike `cli/run_replay.py`
+  (which already correctly binds `as_of_date=session.expected_completed_session`). Without it, the
+  provider fetches an unbounded, rolling `period=` window with no cutoff at all — a same-day/
+  in-progress `^NSEI` row could reach `Market_Regime`/`RS_*` for a run whose signal is scored on
+  the prior completed session (e.g. a 2026-09-24 benchmark bar influencing a 2026-09-23 signal).
+  Both call sites now bind explicitly to `session.expected_completed_session`, reusing the
+  existing provider-level `as_of_date` mechanism — no new cutoff logic, `run_replay.py` and
+  `BenchmarkProvider` unchanged. New `tests/integration/test_daily_benchmark_asof_binding.py`
+  exercises the real `cli.run_daily.main()`/`cli.run_scan.main()` entry points (not a provider
+  mimic): proves the actual constructor call now carries the right `as_of_date`, and proves a
+  benchmark row dated after the completed session cannot reach `Market_Regime`. Verified to fail
+  on the pre-fix call sites and pass after.
+
+- **Fixed: security-master source-date vs retrieval-timestamp provenance.**
+  `nse_reports.py::snapshot()` set `UniverseSnapshot.snapshot_date = result.retrieved_at.date()` —
+  conflating the security FILE's own report/effective date (embedded in its filename, e.g.
+  `NSE_CM_security_23092026.csv.gz` → 2026-09-23) with the timestamp this process happened to
+  download it (which can be a later calendar date, e.g. 2026-09-24). `DiscoveryResult`/
+  `SecurityFileResult` now carry `source_date: date | None`, captured directly from the date
+  already known while constructing the winning dated URL. `snapshot()` now sets
+  `snapshot_date=result.source_date` and **raises** rather than silently substituting
+  `retrieved_at` when no date can be honestly attributed (discovery fell back to the undated
+  `EQUITY_L.csv` template) — fail safely, never guess. `retrieved_at` continues to be recorded
+  separately and is never overwritten. **Scope note:** `snapshot()` is currently called only from
+  tests — the live `NSEMainboardEquityUniverseProvider` does not call it yet, so this fix corrects
+  the record the moment something wires `snapshot()` into the live path; it does not change
+  today's live provenance output. A structurally identical bug exists in the separate NIFTY_200
+  `universe/validation.py::build_snapshot()` path — **not fixed here** (out of scope), flagged for
+  a future patch. New `tests/unit/test_security_master_provenance.py` (5 tests); one pre-existing
+  test's fixture updated to supply `source_date` (its intent — empty mainboard → `INVALID` — is
+  unrelated to provenance). Verified to fail on the pre-fix code and pass after.
+
+Not implemented in this release (explicitly out of scope, per the P1 forensic audit's open
+questions): the `NSE_MAINBOARD_EQ` predicate (EQ vs EQ+BE, `DelFlg`, `PrtdToTrad`,
+`ElgbltyNrmlMkt`, `SctyStsNrmlMkt`), ETF/REIT/INVIT exclusion, deterministic EQ/BE dedup
+preference, and point-in-time security-master support for historical replay. All existing
+survivorship-bias/current-vs-historical disclosures are unchanged.
+
+Full validation: 211/211 tests passed (202 baseline + 9 new), ruff clean, mypy clean (78 files),
+`python -m build --sdist --wheel --no-isolation` successful.
+
 ## 1.3.1 — P1 provider hardening: benchmark normalization + security-master discovery
 
 Fixes two concrete provider failures discovered by real execution against live yfinance and
