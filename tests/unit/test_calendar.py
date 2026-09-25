@@ -113,18 +113,18 @@ def test_2026_holiday_calendar_matches_the_verified_official_circular():
     holidays_2026 = load_holiday_set("config/nse_holidays.yaml", {2026})
 
     expected = {
-        date(2026, 1, 15),   # ad-hoc: Maharashtra municipal elections (modification circular)
-        date(2026, 1, 26),   # Republic Day
-        date(2026, 3, 3),    # Holi
-        date(2026, 3, 26),   # Shri Ram Navami
-        date(2026, 3, 31),   # Shri Mahavir Jayanti
-        date(2026, 4, 3),    # Good Friday
-        date(2026, 4, 14),   # Dr. Baba Saheb Ambedkar Jayanti
-        date(2026, 5, 1),    # Maharashtra Day
-        date(2026, 5, 28),   # Bakri Id
-        date(2026, 6, 26),   # Muharram
-        date(2026, 9, 14),   # Ganesh Chaturthi
-        date(2026, 10, 2),   # Mahatma Gandhi Jayanti
+        date(2026, 1, 15),  # ad-hoc: Maharashtra municipal elections (modification circular)
+        date(2026, 1, 26),  # Republic Day
+        date(2026, 3, 3),  # Holi
+        date(2026, 3, 26),  # Shri Ram Navami
+        date(2026, 3, 31),  # Shri Mahavir Jayanti
+        date(2026, 4, 3),  # Good Friday
+        date(2026, 4, 14),  # Dr. Baba Saheb Ambedkar Jayanti
+        date(2026, 5, 1),  # Maharashtra Day
+        date(2026, 5, 28),  # Bakri Id
+        date(2026, 6, 26),  # Muharram
+        date(2026, 9, 14),  # Ganesh Chaturthi
+        date(2026, 10, 2),  # Mahatma Gandhi Jayanti
         date(2026, 10, 20),  # Dussehra
         date(2026, 11, 10),  # Diwali-Balipratipada
         date(2026, 11, 24),  # Prakash Gurpurb Sri Guru Nanak Dev

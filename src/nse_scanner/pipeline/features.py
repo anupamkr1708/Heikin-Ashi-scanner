@@ -20,8 +20,9 @@ from nse_scanner.indicators.volume import calculate_volume_liquidity
 from nse_scanner.strategy.breakout import calculate_breakout_state
 
 
-def build_feature_frame(ohlc: pd.DataFrame, cfg: ScannerConfig, index_features: pd.DataFrame | None = None
-                         ) -> pd.DataFrame:
+def build_feature_frame(
+    ohlc: pd.DataFrame, cfg: ScannerConfig, index_features: pd.DataFrame | None = None
+) -> pd.DataFrame:
     """`ohlc` must already be validated (data/validation.py) — this function does not repair or
     reject rows, it only computes derived features. Returns a single wide DataFrame, one row per
     trading session, indexed the same as `ohlc`."""
@@ -40,8 +41,9 @@ def build_feature_frame(ohlc: pd.DataFrame, cfg: ScannerConfig, index_features: 
     df["ATR_Pct"] = atr_pct(atr, df["Close"])
     df["BB_Overshoot_ATR"] = bb_overshoot_atr(df["Close"], df["BB_Upper"], atr)
 
-    trend = calculate_trend_structure(df, cfg.history.min_rows_sma20, cfg.history.min_rows_sma50,
-                                       cfg.history.min_rows_sma200)
+    trend = calculate_trend_structure(
+        df, cfg.history.min_rows_sma20, cfg.history.min_rows_sma50, cfg.history.min_rows_sma200
+    )
     df = df.join(trend)
 
     vol = calculate_volume_liquidity(df)

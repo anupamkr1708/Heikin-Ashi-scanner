@@ -27,10 +27,16 @@ def _index_df(dates: list[str]) -> pd.DataFrame:
     n = len(idx)
     rng = np.random.default_rng(0)
     close = 100 + np.cumsum(rng.uniform(-1, 1, size=n))
-    return pd.DataFrame({
-        "Open": close - 0.5, "High": close + 1, "Low": close - 1, "Close": close,
-        "Volume": rng.integers(1000, 5000, size=n),
-    }, index=idx)
+    return pd.DataFrame(
+        {
+            "Open": close - 0.5,
+            "High": close + 1,
+            "Low": close - 1,
+            "Close": close,
+            "Volume": rng.integers(1000, 5000, size=n),
+        },
+        index=idx,
+    )
 
 
 def _multiindex_single_ticker_df(dates: list[str], ticker: str = "^NSEI") -> pd.DataFrame:
@@ -45,6 +51,7 @@ def cfg() -> DataConfig:
 
 
 # --- basic shapes -----------------------------------------------------------------------------
+
 
 def test_plain_columns_single_ticker(cfg):
     df = _index_df(["2026-01-01", "2026-01-02", "2026-01-05"])
@@ -97,16 +104,31 @@ def test_provider_exception_is_captured_not_raised(cfg):
     assert err is not None and "connection reset" in err
 
 
-def test_missing_ohlc_column_reported_not_raised(cfg):
+def test_missing_optional_volume_column_is_tolerated(cfg):
+    """P1 fix: Volume is optional for the benchmark path (nothing downstream reads it — see
+    normalize_ticker_frame's docstring) — a frame missing ONLY Volume must still succeed, not be
+    rejected the way a missing REQUIRED field (Open/High/Low/Close) would be."""
     df = _index_df(["2026-01-01", "2026-01-02"]).drop(columns=["Volume"])
     with patch("yfinance.download", return_value=df):
         provider = YahooBenchmarkProvider(cfg)
         out, err = provider.fetch_benchmark("^NSEI", period="1y", interval="1d")
+    assert err is None
+    assert out is not None
+    assert list(out.columns) == ["Open", "High", "Low", "Close"]
+    assert "Volume" not in out.columns  # absent, not fabricated as 0/NaN
+
+
+def test_missing_required_field_is_reported_not_raised(cfg):
+    df = _index_df(["2026-01-01", "2026-01-02"]).drop(columns=["Close"])
+    with patch("yfinance.download", return_value=df):
+        provider = YahooBenchmarkProvider(cfg)
+        out, err = provider.fetch_benchmark("^NSEI", period="1y", interval="1d")
     assert out is None
-    assert err is not None and "missing column" in err
+    assert err is not None and "missing required field" in err and "Close" in err
 
 
 # --- AS-OF cutoff (the gap this file was primarily added to close) ----------------------------
+
 
 def test_live_provider_has_no_as_of_cutoff_by_default(cfg):
     provider = YahooBenchmarkProvider(cfg)
@@ -159,3 +181,37 @@ def test_as_of_provider_boundary_is_inclusive(cfg):
         out, _err = provider.fetch_benchmark("^NSEI", period="2y", interval="1d")
     assert out is not None
     assert date(2026, 9, 8) in {ts.date() for ts in out.index}
+
+
+# --- P1 provider-hardening: exact test names requested for the as-of contract, alongside the
+# equivalent (differently-named) coverage above, which must remain per the checkpoint rules.
+
+
+def test_as_of_excludes_future_rows(cfg):
+    df = _index_df(["2026-09-21", "2026-09-22", "2026-09-23"])
+    with patch("yfinance.download", return_value=df):
+        provider = YahooBenchmarkProvider(cfg, as_of_date=date(2026, 9, 21))
+        out, err = provider.fetch_benchmark("^NSEI", period="2y", interval="1d")
+    assert err is None
+    assert out is not None
+    assert out.index.max().date() == date(2026, 9, 21)
+    assert date(2026, 9, 22) not in {ts.date() for ts in out.index}
+    assert date(2026, 9, 23) not in {ts.date() for ts in out.index}
+
+
+def test_as_of_includes_boundary_date(cfg):
+    df = _index_df(["2026-09-20", "2026-09-21"])
+    with patch("yfinance.download", return_value=df):
+        provider = YahooBenchmarkProvider(cfg, as_of_date=date(2026, 9, 21))
+        out, err = provider.fetch_benchmark("^NSEI", period="2y", interval="1d")
+    assert err is None
+    assert date(2026, 9, 21) in {ts.date() for ts in out.index}
+
+
+def test_as_of_all_future_rows_fails(cfg):
+    df = _index_df(["2026-09-22", "2026-09-23"])
+    with patch("yfinance.download", return_value=df):
+        provider = YahooBenchmarkProvider(cfg, as_of_date=date(2026, 9, 21))
+        out, err = provider.fetch_benchmark("^NSEI", period="2y", interval="1d")
+    assert out is None
+    assert err is not None and "as_of=2026-09-21" in err

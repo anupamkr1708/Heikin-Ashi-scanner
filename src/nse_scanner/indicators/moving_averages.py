@@ -19,8 +19,9 @@ def tiered_sma(close: pd.Series, window: int, min_rows_needed: int) -> tuple[pd.
     return sma, status
 
 
-def calculate_trend_structure(df: pd.DataFrame, min_rows_sma20: int = 20, min_rows_sma50: int = 50,
-                               min_rows_sma200: int = 200) -> pd.DataFrame:
+def calculate_trend_structure(
+    df: pd.DataFrame, min_rows_sma20: int = 20, min_rows_sma50: int = 50, min_rows_sma200: int = 200
+) -> pd.DataFrame:
     close = df["Close"]
     ts = pd.DataFrame(index=df.index)
 

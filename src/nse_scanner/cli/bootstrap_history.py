@@ -49,11 +49,19 @@ VALID_PERIODS = ("1y", "2y", "5y", "10y", "max")
 def build_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="One-time/occasional historical bootstrap via yfinance")
     p.add_argument("--universe", default=None, help="Override universe_scope (e.g. NIFTY_200, NSE_MAINBOARD_EQ)")
-    p.add_argument("--provider", default="yfinance", choices=["yfinance"],
-                    help="Historical bootstrap provider (only yfinance is supported — PART: "
-                         "'yfinance: SECONDARY historical bootstrap')")
-    p.add_argument("--period", default="2y", choices=VALID_PERIODS,
-                    help="How much history to backfill (ignored if --start/--end are given)")
+    p.add_argument(
+        "--provider",
+        default="yfinance",
+        choices=["yfinance"],
+        help="Historical bootstrap provider (only yfinance is supported — PART: "
+        "'yfinance: SECONDARY historical bootstrap')",
+    )
+    p.add_argument(
+        "--period",
+        default="2y",
+        choices=VALID_PERIODS,
+        help="How much history to backfill (ignored if --start/--end are given)",
+    )
     p.add_argument("--start", default=None, help="Explicit start date YYYY-MM-DD (overrides --period)")
     p.add_argument("--end", default=None, help="Explicit end date YYYY-MM-DD (defaults to today if --start is given)")
     p.add_argument("--config", default="config/default.yaml")
@@ -96,11 +104,16 @@ def main(argv: list[str] | None = None) -> int:
     yf_to_nse = {v: k for k, v in nse_to_yf.items()}
 
     yf_provider = YahooFinanceProvider(cfg.data)
-    print(f"Downloading {len(nse_to_yf)} symbols from Yahoo Finance in batches of {cfg.data.batch_size} "
-          f"(this can take a while for large universes)...")
+    print(
+        f"Downloading {len(nse_to_yf)} symbols from Yahoo Finance in batches of {cfg.data.batch_size} "
+        f"(this can take a while for large universes)..."
+    )
     results, download_errors = yf_provider.fetch_history_batch(
-        list(nse_to_yf.values()), period=args.period, interval=cfg.data.interval,
-        start=args.start, end=args.end,
+        list(nse_to_yf.values()),
+        period=args.period,
+        interval=cfg.data.interval,
+        start=args.start,
+        end=args.end,
     )
 
     store = MarketDataStore(cfg.paths.processed_dir, cfg.paths.duckdb_path)
@@ -129,28 +142,32 @@ def main(argv: list[str] | None = None) -> int:
         if n_rows < cfg.history.min_rows_primary:
             insufficient_symbols.append(nse_symbol)
 
-        normalized = pd.DataFrame({
-            "nse_symbol": nse_symbol,
-            "isin": None,
-            "trade_date": clean_df.index,
-            "open": clean_df["Open"].to_numpy(),
-            "high": clean_df["High"].to_numpy(),
-            "low": clean_df["Low"].to_numpy(),
-            "close": clean_df["Close"].to_numpy(),
-            "volume": clean_df["Volume"].to_numpy(),
-            "turnover": None,
-            "source": "YFINANCE",
-            "price_basis": PriceBasis.ADJUSTED if cfg.data.yfinance_auto_adjust else PriceBasis.RAW,
-            "schema_version": "yfinance_bootstrap",
-            "ingested_at": now,
-        })
+        normalized = pd.DataFrame(
+            {
+                "nse_symbol": nse_symbol,
+                "isin": None,
+                "trade_date": clean_df.index,
+                "open": clean_df["Open"].to_numpy(),
+                "high": clean_df["High"].to_numpy(),
+                "low": clean_df["Low"].to_numpy(),
+                "close": clean_df["Close"].to_numpy(),
+                "volume": clean_df["Volume"].to_numpy(),
+                "turnover": None,
+                "source": "YFINANCE",
+                "price_basis": PriceBasis.ADJUSTED if cfg.data.yfinance_auto_adjust else PriceBasis.RAW,
+                "schema_version": "yfinance_bootstrap",
+                "ingested_at": now,
+            }
+        )
         all_normalized.append(normalized)
 
     if all_normalized:
         combined = pd.concat(all_normalized, ignore_index=True)
         total_rows = store.append_eod_prices(combined)
-        print(f"Stored bootstrap history for {len(populated_symbols)} symbols "
-              f"({len(combined)} new rows; store now has {total_rows} total rows across all symbols/sessions).")
+        print(
+            f"Stored bootstrap history for {len(populated_symbols)} symbols "
+            f"({len(combined)} new rows; store now has {total_rows} total rows across all symbols/sessions)."
+        )
     else:
         print("No symbols were successfully downloaded — nothing stored.", file=sys.stderr)
 
@@ -162,8 +179,9 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Universe:                  {len(constituents)}")
     print(f"Requested history:         {history_desc}")
     print(f"Successfully populated:    {len(populated_symbols)}")
-    print(f"  of which insufficient"
-          f" for PRIMARY (< {cfg.history.min_rows_primary} rows): {len(insufficient_symbols)}")
+    print(
+        f"  of which insufficient" f" for PRIMARY (< {cfg.history.min_rows_primary} rows): {len(insufficient_symbols)}"
+    )
     print(f"Failed downloads:          {len(failed_download_symbols)}")
     print(f"Failed validation:         {len(validation_failed)}")
     if populated_rows:
@@ -176,9 +194,11 @@ def main(argv: list[str] | None = None) -> int:
         preview = ", ".join(failed_download_symbols[:15])
         more = f" (+{len(failed_download_symbols) - 15} more)" if len(failed_download_symbols) > 15 else ""
         print(f"\nFailed download symbols: {preview}{more}")
-        print("(Check config/symbol_overrides.yaml if these are known-renamed tickers — a wrong "
-              "NSE->Yahoo mapping shows up here as a download failure, since this script does not "
-              "pre-validate a mapping's existence before attempting the download.)")
+        print(
+            "(Check config/symbol_overrides.yaml if these are known-renamed tickers — a wrong "
+            "NSE->Yahoo mapping shows up here as a download failure, since this script does not "
+            "pre-validate a mapping's existence before attempting the download.)"
+        )
 
     print("=" * 70)
     print("Next step: python scripts/run_daily.py")

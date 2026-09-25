@@ -8,10 +8,16 @@ from nse_scanner.exceptions import DataValidationError
 def _good_df(n=40):
     idx = pd.date_range("2025-01-01", periods=n)
     close = 100 + np.cumsum(np.random.default_rng(0).normal(0, 1, n))
-    return pd.DataFrame({
-        "Open": close - 0.5, "High": close + 1, "Low": close - 1, "Close": close,
-        "Volume": np.random.default_rng(1).integers(1000, 5000, n),
-    }, index=idx)
+    return pd.DataFrame(
+        {
+            "Open": close - 0.5,
+            "High": close + 1,
+            "Low": close - 1,
+            "Close": close,
+            "Volume": np.random.default_rng(1).integers(1000, 5000, n),
+        },
+        index=idx,
+    )
 
 
 def test_valid_data_passes():

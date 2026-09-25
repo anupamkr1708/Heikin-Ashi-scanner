@@ -39,21 +39,18 @@ logger = get_logger(__name__)
 
 NSE_HOMEPAGE = "https://www.nseindia.com"
 NSE_HEADERS = {
-    "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                    "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"),
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+    ),
     "Accept": "text/csv,application/csv,application/zip,text/plain,*/*",
     "Accept-Language": "en-US,en;q=0.9",
 }
 
 # UDiFF Common Bhavcopy Final (current primary format as of this repository's knowledge cutoff).
-UDIFF_URL_TEMPLATE = (
-    "https://nsearchives.nseindia.com/content/cm/"
-    "BhavCopy_NSE_CM_0_0_0_{yyyymmdd}_F_0000.csv.zip"
-)
+UDIFF_URL_TEMPLATE = "https://nsearchives.nseindia.com/content/cm/" "BhavCopy_NSE_CM_0_0_0_{yyyymmdd}_F_0000.csv.zip"
 # Legacy per-day bhavcopy CSV (kept as a documented fallback — PART 3 resilience requirement).
 LEGACY_URL_TEMPLATE = (
-    "https://nsearchives.nseindia.com/content/historical/EQUITIES/"
-    "{year}/{mon}/cm{ddmmmyyyy}bhav.csv.zip"
+    "https://nsearchives.nseindia.com/content/historical/EQUITIES/" "{year}/{mon}/cm{ddmmmyyyy}bhav.csv.zip"
 )
 
 # UDiFF column names -> canonical OHLCV. NSE's UDiFF schema uses these field names as of this
@@ -87,9 +84,9 @@ LEGACY_COLUMN_MAP = {
 @dataclass
 class NseBhavcopyResult:
     session_date: date
-    frame: pd.DataFrame          # long-format: one row per security for this session
+    frame: pd.DataFrame  # long-format: one row per security for this session
     source_url: str
-    schema_version: str          # "UDIFF" | "LEGACY"
+    schema_version: str  # "UDIFF" | "LEGACY"
     retrieved_at: datetime
     file_hash: str
     row_count: int
@@ -142,8 +139,13 @@ def fetch_bhavcopy(session_date: date, timeout: int = 20) -> NseBhavcopyResult:
             raise DataProviderError(f"UDiFF response missing expected columns: {missing}")
         file_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
         return NseBhavcopyResult(
-            session_date=session_date, frame=df, source_url=udiff_url, schema_version="UDIFF",
-            retrieved_at=datetime.now(timezone.utc), file_hash=file_hash, row_count=len(df),
+            session_date=session_date,
+            frame=df,
+            source_url=udiff_url,
+            schema_version="UDIFF",
+            retrieved_at=datetime.now(timezone.utc),
+            file_hash=file_hash,
+            row_count=len(df),
         )
     except Exception as e:  # noqa: BLE001 - deliberately broad: fall through to legacy format
         attempts.append(f"UDIFF[{udiff_url}] -> {type(e).__name__}: {e}")
@@ -160,8 +162,13 @@ def fetch_bhavcopy(session_date: date, timeout: int = 20) -> NseBhavcopyResult:
             raise DataProviderError(f"legacy bhavcopy response missing expected columns: {missing}")
         file_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
         return NseBhavcopyResult(
-            session_date=session_date, frame=df, source_url=legacy_url, schema_version="LEGACY",
-            retrieved_at=datetime.now(timezone.utc), file_hash=file_hash, row_count=len(df),
+            session_date=session_date,
+            frame=df,
+            source_url=legacy_url,
+            schema_version="LEGACY",
+            retrieved_at=datetime.now(timezone.utc),
+            file_hash=file_hash,
+            row_count=len(df),
         )
     except Exception as e:  # noqa: BLE001
         attempts.append(f"LEGACY[{legacy_url}] -> {type(e).__name__}: {e}")
@@ -192,12 +199,13 @@ class NSEDataProvider(DataProvider):
 
     name: str = "NSE"
     price_basis: str = "RAW"  # static fallback label; fetch_history reports the REAL per-symbol
-                                # basis (which can be BLENDED if bootstrap history was used) via
-                                # the returned NormalizedBarMeta.price_basis instead of this.
+    # basis (which can be BLENDED if bootstrap history was used) via
+    # the returned NormalizedBarMeta.price_basis instead of this.
     store: object = field(default=None)  # nse_scanner.data.storage.MarketDataStore, injected
 
-    def fetch_history(self, symbol: str, period: str, interval: str
-                       ) -> tuple[pd.DataFrame | None, NormalizedBarMeta | None, str | None]:
+    def fetch_history(
+        self, symbol: str, period: str, interval: str
+    ) -> tuple[pd.DataFrame | None, NormalizedBarMeta | None, str | None]:
         if self.store is None:
             return None, None, "NSEDataProvider has no local store configured — run ingest_eod.py first"
         df = self.store.read_symbol_history(symbol)  # type: ignore[attr-defined]
@@ -205,13 +213,19 @@ class NSEDataProvider(DataProvider):
             return None, None, "no locally-ingested NSE history for this symbol"
         actual_price_basis = self.store.price_basis_composition(symbol)  # type: ignore[attr-defined]
         meta = NormalizedBarMeta(
-            isin=None, nse_symbol=symbol, source=self.name, price_basis=actual_price_basis,
-            interval=interval, retrieved_at=datetime.now(timezone.utc), provider_version="bhavcopy",
+            isin=None,
+            nse_symbol=symbol,
+            source=self.name,
+            price_basis=actual_price_basis,
+            interval=interval,
+            retrieved_at=datetime.now(timezone.utc),
+            provider_version="bhavcopy",
         )
         return df, meta, None
 
-    def fetch_history_batch(self, symbols: list[str], period: str, interval: str
-                             ) -> tuple[dict[str, pd.DataFrame], dict[str, str]]:
+    def fetch_history_batch(
+        self, symbols: list[str], period: str, interval: str
+    ) -> tuple[dict[str, pd.DataFrame], dict[str, str]]:
         results: dict[str, pd.DataFrame] = {}
         errors: dict[str, str] = {}
         for sym in symbols:

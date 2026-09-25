@@ -16,8 +16,9 @@ UNAVAILABLE_NO_BENCHMARK = "UNAVAILABLE_NO_BENCHMARK_DATA"
 UNAVAILABLE_INSUFFICIENT_HISTORY = "UNAVAILABLE_INSUFFICIENT_INDEX_HISTORY"
 
 
-def calculate_index_features(index_df_clean: pd.DataFrame, min_rows_sma20: int = 20,
-                              min_rows_sma50: int = 50, min_rows_sma200: int = 200) -> pd.DataFrame:
+def calculate_index_features(
+    index_df_clean: pd.DataFrame, min_rows_sma20: int = 20, min_rows_sma50: int = 50, min_rows_sma200: int = 200
+) -> pd.DataFrame:
     """Benchmark-index diagnostics used for both Market Regime and Relative Strength.
 
     Regime rule (explicit, documented as a RESEARCH DEFINITION — PART 24 — not an objectively

@@ -39,7 +39,8 @@ def main(argv: list[str] | None = None) -> int:
     provider: UniverseProvider
     if args.override_csv and cfg.universe.universe_scope == "NIFTY_200":
         provider = NSENifty200UniverseProvider(
-            min_count=cfg.universe.nifty200_min_count, max_count=cfg.universe.nifty200_max_count,
+            min_count=cfg.universe.nifty200_min_count,
+            max_count=cfg.universe.nifty200_max_count,
             override_csv_path=args.override_csv,
         )
     else:
@@ -56,16 +57,22 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     snapshot = build_snapshot(
-        universe_id=cfg.universe.universe_scope, constituents_raw=constituents, constituents_clean=constituents,
-        source=source, source_version=None, retrieved_at=datetime.fromisoformat(retrieved_at_iso),
+        universe_id=cfg.universe.universe_scope,
+        constituents_raw=constituents,
+        constituents_clean=constituents,
+        source=source,
+        source_version=None,
+        retrieved_at=datetime.fromisoformat(retrieved_at_iso),
     )
 
     store = MarketDataStore(cfg.paths.processed_dir, cfg.paths.duckdb_path)
     store.write_parquet("universe_snapshots", pd.DataFrame([snapshot.to_dict()]))
     store.write_parquet("security_master_latest", constituents)
 
-    print(f"Universe snapshot OK: {snapshot.constituent_count} constituents from {source} "
-          f"(universe_scope={cfg.universe.universe_scope})")
+    print(
+        f"Universe snapshot OK: {snapshot.constituent_count} constituents from {source} "
+        f"(universe_scope={cfg.universe.universe_scope})"
+    )
     return 0
 
 

@@ -43,8 +43,12 @@ def test_offline_fixture_manifest_on_disk_carries_the_previously_dropped_fields(
 
     extra = manifest["extra"]
     for key in (
-        "benchmark_status", "data_validation_failures", "insufficient_history_count",
-        "security_scan_failures", "signals_current", "signals_stale",
+        "benchmark_status",
+        "data_validation_failures",
+        "insufficient_history_count",
+        "security_scan_failures",
+        "signals_current",
+        "signals_stale",
     ):
         assert key in extra, f"{key!r} missing from manifest['extra'] — the v1.3 fix regressed"
     # Sanity: these should be the real, non-placeholder values (int/str), not None stand-ins.
@@ -58,8 +62,11 @@ def test_manifest_extra_survives_a_second_offline_run_with_different_values(tmp_
     runs (widening it should not shrink the observed signal count in this fixture) and checking
     the manifest's signals_current tracks `ScanRunResult.signals_current` on each run."""
     cfg_a = ScannerConfig(paths=PathsConfig(reports_dir=str(tmp_path / "a")))
-    cfg_b = replace(cfg_a, paths=PathsConfig(reports_dir=str(tmp_path / "b")),
-                     baseline=replace(cfg_a.baseline, min_ha_body_pct=99.0))  # impossibly strict
+    cfg_b = replace(
+        cfg_a,
+        paths=PathsConfig(reports_dir=str(tmp_path / "b")),
+        baseline=replace(cfg_a.baseline, min_ha_body_pct=99.0),
+    )  # impossibly strict
     store = MarketDataStore(tmp_path / "processed", tmp_path / "db.duckdb")
     today = date(2026, 9, 15)
     session = SessionInfo(today, today, today, today)

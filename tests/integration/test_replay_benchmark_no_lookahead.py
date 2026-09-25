@@ -44,10 +44,16 @@ def _synthetic_index(n_days: int, seed: int = 99) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     dates = pd.bdate_range(end=pd.Timestamp.today().normalize() - pd.Timedelta(days=1), periods=n_days)
     closes = 20000.0 + np.cumsum(rng.normal(5.0, 40.0, size=n_days))
-    return pd.DataFrame({
-        "Open": closes - 10, "High": closes + 20, "Low": closes - 20, "Close": closes,
-        "Volume": rng.integers(1_000_000, 5_000_000, size=n_days),
-    }, index=dates)
+    return pd.DataFrame(
+        {
+            "Open": closes - 10,
+            "High": closes + 20,
+            "Low": closes - 20,
+            "Close": closes,
+            "Volume": rng.integers(1_000_000, 5_000_000, size=n_days),
+        },
+        index=dates,
+    )
 
 
 def _run_replay_style_scan(tmp_path: Path, cutoff_idx: int, mocked_index_df: pd.DataFrame):
@@ -74,8 +80,14 @@ def _run_replay_style_scan(tmp_path: Path, cutoff_idx: int, mocked_index_df: pd.
     benchmark_provider = YahooBenchmarkProvider(cfg.data, as_of_date=cutoff)
 
     with patch("yfinance.download", return_value=mocked_index_df.copy()):
-        result = run_scan(cfg, InMemoryUniverseProvider(universe_df), data_provider,
-                           benchmark_provider, session=session, holidays=set())
+        result = run_scan(
+            cfg,
+            InMemoryUniverseProvider(universe_df),
+            data_provider,
+            benchmark_provider,
+            session=session,
+            holidays=set(),
+        )
     return result, cutoff
 
 
@@ -112,16 +124,25 @@ def test_replay_market_regime_sheet_is_immutable_to_future_benchmark_sessions(tm
     # Extend with 40 more sessions AFTER the original 100, including a violent engineered move
     # (a regime-flipping crash) that a leaking implementation would be very likely to expose.
     extra_dates = pd.bdate_range(
-        start=index_before.index[-1] + pd.Timedelta(days=1), periods=40,
+        start=index_before.index[-1] + pd.Timedelta(days=1),
+        periods=40,
     )
     crash_close = index_before["Close"].iloc[-1] * np.linspace(1.0, 0.55, 40)  # -45% engineered crash
-    index_after = pd.concat([
-        index_before,
-        pd.DataFrame({
-            "Open": crash_close * 1.01, "High": crash_close * 1.02, "Low": crash_close * 0.97,
-            "Close": crash_close, "Volume": np.full(40, 9_000_000),
-        }, index=extra_dates),
-    ])
+    index_after = pd.concat(
+        [
+            index_before,
+            pd.DataFrame(
+                {
+                    "Open": crash_close * 1.01,
+                    "High": crash_close * 1.02,
+                    "Low": crash_close * 0.97,
+                    "Close": crash_close,
+                    "Volume": np.full(40, 9_000_000),
+                },
+                index=extra_dates,
+            ),
+        ]
+    )
     assert len(index_after) == len(index_before) + 40  # genuinely appended, nothing rewritten
     pd.testing.assert_frame_equal(index_after.iloc[:100], index_before)
 

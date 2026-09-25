@@ -55,8 +55,9 @@ class PortfolioResult:
     metrics: dict[str, float]
 
 
-def run_portfolio_backtest(candidates: list[TradeCandidate], initial_capital: float,
-                            risk_cfg: RiskConfig, cost_cfg: CostProfileConfig) -> PortfolioResult:
+def run_portfolio_backtest(
+    candidates: list[TradeCandidate], initial_capital: float, risk_cfg: RiskConfig, cost_cfg: CostProfileConfig
+) -> PortfolioResult:
     """Single-pass, chronological, capital-constrained simulation.
 
     Candidates are processed in entry-date order. A candidate is skipped (not filled) if taking
@@ -100,9 +101,7 @@ def run_portfolio_backtest(candidates: list[TradeCandidate], initial_capital: fl
 
             current_exposure = sum(p.entry_value for p in open_positions)
             portfolio_value_now = cash + current_exposure
-            sector_exposure = sum(
-                p.entry_value for p in open_positions if p.trade.sector == cand.sector
-            )
+            sector_exposure = sum(p.entry_value for p in open_positions if p.trade.sector == cand.sector)
 
             per_position_budget = portfolio_value_now / risk_cfg.max_concurrent_positions
             shares = int(per_position_budget / cand.entry_price) if cand.entry_price > 0 else 0
@@ -142,14 +141,21 @@ def run_portfolio_backtest(candidates: list[TradeCandidate], initial_capital: fl
     metrics = _compute_metrics(equity_curve, daily_returns, closed_positions, cost_cfg, initial_capital)
 
     return PortfolioResult(
-        equity_curve=equity_curve, daily_returns=daily_returns,
-        trades_taken=trades_taken, trades_skipped_capacity=trades_skipped, metrics=metrics,
+        equity_curve=equity_curve,
+        daily_returns=daily_returns,
+        trades_taken=trades_taken,
+        trades_skipped_capacity=trades_skipped,
+        metrics=metrics,
     )
 
 
-def _compute_metrics(equity_curve: pd.Series, daily_returns: pd.Series,
-                      closed_positions: list[tuple[OpenPosition, float]], cost_cfg: CostProfileConfig,
-                      initial_capital: float) -> dict[str, float]:
+def _compute_metrics(
+    equity_curve: pd.Series,
+    daily_returns: pd.Series,
+    closed_positions: list[tuple[OpenPosition, float]],
+    cost_cfg: CostProfileConfig,
+    initial_capital: float,
+) -> dict[str, float]:
     if equity_curve.empty:
         return {}
 
@@ -181,9 +187,7 @@ def _compute_metrics(equity_curve: pd.Series, daily_returns: pd.Series,
     profit_factor = (sum(wins) / abs(sum(losses))) if losses else (float("inf") if wins else float("nan"))
 
     longest_losing_streak = _longest_losing_streak(trade_returns_net)
-    holding_periods = [
-        (pos.trade.exit_date - pos.trade.entry_date).days for pos, _ in closed_positions
-    ]
+    holding_periods = [(pos.trade.exit_date - pos.trade.entry_date).days for pos, _ in closed_positions]
 
     return {
         "CAGR": cagr,

@@ -10,10 +10,19 @@ from nse_scanner.data.storage import (
 
 def _row(symbol, trade_date, close, source, price_basis):
     return {
-        "nse_symbol": symbol, "isin": None, "trade_date": pd.Timestamp(trade_date),
-        "open": close - 1, "high": close + 1, "low": close - 2, "close": close, "volume": 1000,
-        "turnover": None, "source": source, "price_basis": price_basis,
-        "schema_version": "test", "ingested_at": pd.Timestamp("2026-01-01"),
+        "nse_symbol": symbol,
+        "isin": None,
+        "trade_date": pd.Timestamp(trade_date),
+        "open": close - 1,
+        "high": close + 1,
+        "low": close - 2,
+        "close": close,
+        "volume": 1000,
+        "turnover": None,
+        "source": source,
+        "price_basis": price_basis,
+        "schema_version": "test",
+        "ingested_at": pd.Timestamp("2026-01-01"),
     }
 
 
@@ -103,6 +112,7 @@ def test_price_basis_composition_blended_bootstrap_plus_daily(tmp_path):
 
 def test_missing_required_columns_raises(tmp_path):
     from nse_scanner.exceptions import StorageError
+
     store = MarketDataStore(tmp_path / "processed", tmp_path / "db.duckdb")
     with pytest.raises(StorageError):
         store.append_eod_prices(pd.DataFrame([{"nse_symbol": "FOO"}]))

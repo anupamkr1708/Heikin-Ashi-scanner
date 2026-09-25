@@ -35,8 +35,9 @@ from nse_scanner.research.survivorship import label_current_universe_mode
 from nse_scanner.research.walk_forward import generate_walk_forward_windows
 
 
-def _events_and_forward_returns_in_window(feature_frames: dict[str, pd.DataFrame], cfg,
-                                           window_start: date, window_end: date) -> pd.DataFrame:
+def _events_and_forward_returns_in_window(
+    feature_frames: dict[str, pd.DataFrame], cfg, window_start: date, window_end: date
+) -> pd.DataFrame:
     """Restricts each symbol's already-computed feature frame to [window_start, window_end]
     BEFORE event extraction, so a window's results can only reflect signals whose date actually
     falls inside that window — the train/test date fencing this whole script exists to enforce."""
@@ -44,13 +45,17 @@ def _events_and_forward_returns_in_window(feature_frames: dict[str, pd.DataFrame
     for symbol, feat in feature_frames.items():
         sliced = feat[(feat.index.date >= window_start) & (feat.index.date <= window_end)]
         if not sliced.empty:
-            windowed[symbol] = feat.loc[:sliced.index[-1]]  # keep full history UP TO window_end
-                                                              # for correct rolling-indicator values,
-                                                              # but events are only extracted where
-                                                              # the signal date itself falls in-window
+            windowed[symbol] = feat.loc[: sliced.index[-1]]  # keep full history UP TO window_end
+            # for correct rolling-indicator values,
+            # but events are only extracted where
+            # the signal date itself falls in-window
 
-    events = extract_events(windowed, cfg.baseline.max_bb_overshoot_pct, cfg.baseline.min_ha_body_pct,
-                             cfg.research.independent_event_cooldown_days)
+    events = extract_events(
+        windowed,
+        cfg.baseline.max_bb_overshoot_pct,
+        cfg.baseline.min_ha_body_pct,
+        cfg.research.independent_event_cooldown_days,
+    )
     if events.independent_events.empty:
         return pd.DataFrame()
 
@@ -118,9 +123,12 @@ def main(argv: list[str] | None = None) -> int:
 
     windows = generate_walk_forward_windows(data_start, data_end, train_years, test_months)
     if not windows:
-        print(f"No complete walk-forward window fits in the available data range "
-              f"({data_start} .. {data_end}) with train_years={train_years}, test_months={test_months}. "
-              f"Need more history (bootstrap_history.py --period 5y or more).", file=sys.stderr)
+        print(
+            f"No complete walk-forward window fits in the available data range "
+            f"({data_start} .. {data_end}) with train_years={train_years}, test_months={test_months}. "
+            f"Need more history (bootstrap_history.py --period 5y or more).",
+            file=sys.stderr,
+        )
         return 1
 
     print(f"DATA RANGE:        {data_start} .. {data_end}")
@@ -142,8 +150,11 @@ def main(argv: list[str] | None = None) -> int:
         test_stats = _stats_or_none(test_df)
 
         row = {
-            "window_id": w.window_id, "train_start": w.train_start, "train_end": w.train_end,
-            "test_start": w.test_start, "test_end": w.test_end,
+            "window_id": w.window_id,
+            "train_start": w.train_start,
+            "train_end": w.train_end,
+            "test_start": w.test_start,
+            "test_end": w.test_end,
             "strategy_id": cfg.baseline.strategy_id,
             "train_n": train_stats.n if train_stats else 0,
             "train_mean_return_pct": train_stats.mean if train_stats else None,
@@ -153,9 +164,11 @@ def main(argv: list[str] | None = None) -> int:
             "test_win_rate": test_stats.win_rate if test_stats else None,
         }
         window_rows.append(row)
-        print(f"Window {w.window_id}: train[{w.train_start}..{w.train_end}] N={row['train_n']} "
-              f"-> test[{w.test_start}..{w.test_end}] N={row['test_n']}"
-              + (f" mean={row['test_mean_return_pct']:.2f}%" if row["test_mean_return_pct"] is not None else ""))
+        print(
+            f"Window {w.window_id}: train[{w.train_start}..{w.train_end}] N={row['train_n']} "
+            f"-> test[{w.test_start}..{w.test_end}] N={row['test_n']}"
+            + (f" mean={row['test_mean_return_pct']:.2f}%" if row["test_mean_return_pct"] is not None else "")
+        )
 
     windows_df = pd.DataFrame(window_rows)
     Path(cfg.paths.reports_dir).mkdir(parents=True, exist_ok=True)
@@ -165,8 +178,10 @@ def main(argv: list[str] | None = None) -> int:
     print("-" * 70)
     n_windows_with_test_events = int((windows_df["test_n"] > 0).sum())
     print(f"Windows with >=1 OOS event: {n_windows_with_test_events}/{len(windows_df)}")
-    print("Per-window results (not a single pooled number — look for consistency/instability "
-          "across windows, per PART 27/54's explicit instruction not to search for one magic result).")
+    print(
+        "Per-window results (not a single pooled number — look for consistency/instability "
+        "across windows, per PART 27/54's explicit instruction not to search for one magic result)."
+    )
     print(f"Results written to {out_path}")
     return 0
 

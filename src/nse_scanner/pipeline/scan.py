@@ -54,8 +54,8 @@ HISTORY_SUFFICIENT = "SUFFICIENT"
 HISTORY_INSUFFICIENT = "INSUFFICIENT_HISTORY"
 HISTORY_NO_DATA = "NO_DATA"
 
-FAILURE_DATA_VALIDATION = "data_validation_failure"   # routine: insufficient history, bad OHLC, no data
-FAILURE_SECURITY_SCAN = "security_scan_failure"        # unexpected: sanity-gate trip or other bug
+FAILURE_DATA_VALIDATION = "data_validation_failure"  # routine: insufficient history, bad OHLC, no data
+FAILURE_SECURITY_SCAN = "security_scan_failure"  # unexpected: sanity-gate trip or other bug
 
 
 @dataclass
@@ -101,9 +101,15 @@ def _diagnostic_row(symbol: str, rec, **overrides) -> dict:
     return row
 
 
-def run_scan(cfg: ScannerConfig, universe_provider: UniverseProvider, data_provider: DataProvider,
-             benchmark_provider: BenchmarkProvider | None, session: SessionInfo,
-             holidays: set, symbol_override_path: str | None = None) -> ScanRunResult:
+def run_scan(
+    cfg: ScannerConfig,
+    universe_provider: UniverseProvider,
+    data_provider: DataProvider,
+    benchmark_provider: BenchmarkProvider | None,
+    session: SessionInfo,
+    holidays: set,
+    symbol_override_path: str | None = None,
+) -> ScanRunResult:
     run_id = str(uuid.uuid4())
     scan_log_rows: list[dict] = []
 
@@ -123,19 +129,31 @@ def run_scan(cfg: ScannerConfig, universe_provider: UniverseProvider, data_provi
     benchmark_status = "UNAVAILABLE"
     if benchmark_provider is not None:
         idx_df, err = benchmark_provider.fetch_benchmark(
-            cfg.benchmark.index_ticker, period=cfg.research.live_history_period, interval=cfg.data.interval,
+            cfg.benchmark.index_ticker,
+            period=cfg.research.live_history_period,
+            interval=cfg.data.interval,
         )
         if idx_df is not None:
             index_features = calculate_index_features(
-                idx_df, cfg.history.min_rows_sma20, cfg.history.min_rows_sma50, cfg.history.min_rows_sma200,
+                idx_df,
+                cfg.history.min_rows_sma20,
+                cfg.history.min_rows_sma50,
+                cfg.history.min_rows_sma200,
             )
             benchmark_status = "OK"
         else:
             logger.warning("Benchmark unavailable (baseline scan is unaffected): %s", err)
-            scan_log_rows.append({"security": cfg.benchmark.index_ticker, "stage": "benchmark",
-                                   "provider": type(benchmark_provider).__name__,
-                                   "failure_category": "benchmark_failure", "exception_type": "BenchmarkError",
-                                   "exception_message": err or "unknown", "timestamp": datetime.now().isoformat()})
+            scan_log_rows.append(
+                {
+                    "security": cfg.benchmark.index_ticker,
+                    "stage": "benchmark",
+                    "provider": type(benchmark_provider).__name__,
+                    "failure_category": "benchmark_failure",
+                    "exception_type": "BenchmarkError",
+                    "exception_message": err or "unknown",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
 
     signal_rows: list[dict] = []
     diagnostics_rows: list[dict] = []
@@ -146,9 +164,7 @@ def run_scan(cfg: ScannerConfig, universe_provider: UniverseProvider, data_provi
     for rec in constituents.itertuples(index=False):
         symbol = rec.Symbol
         try:
-            df_raw, meta, err = data_provider.fetch_history(
-                symbol, cfg.research.live_history_period, cfg.data.interval
-            )
+            df_raw, meta, err = data_provider.fetch_history(symbol, cfg.research.live_history_period, cfg.data.interval)
             if df_raw is None:
                 raise DataValidationError(err or "no data returned")
             symbol_price_basis = meta.price_basis if meta is not None else price_basis
@@ -161,10 +177,16 @@ def run_scan(cfg: ScannerConfig, universe_provider: UniverseProvider, data_provi
                 history_status = HISTORY_INSUFFICIENT if rows_available > 0 else HISTORY_NO_DATA
                 insufficient_history_count += 1
                 data_validation_failures += 1
-                diagnostics_rows.append(_diagnostic_row(
-                    symbol, rec, Rows=rows_available, History_Status=history_status,
-                    Failure_Category=FAILURE_DATA_VALIDATION, Failure_Reason=str(e),
-                ))
+                diagnostics_rows.append(
+                    _diagnostic_row(
+                        symbol,
+                        rec,
+                        Rows=rows_available,
+                        History_Status=history_status,
+                        Failure_Category=FAILURE_DATA_VALIDATION,
+                        Failure_Reason=str(e),
+                    )
+                )
                 # Routine/expected (especially pre-bootstrap) — DEBUG only, not WARNING. See
                 # the aggregate summary line logged after the loop.
                 logger.debug("security=%s stage=validation rows=%d reason=%s", symbol, rows_available, e)
@@ -187,48 +209,85 @@ def run_scan(cfg: ScannerConfig, universe_provider: UniverseProvider, data_provi
             mandatory_pass = bb_breakout and bb_size_ok and ha_strength_ok
 
             if not mandatory_pass:
-                diagnostics_rows.append(_diagnostic_row(
-                    symbol, rec, Rows=len(df_clean), History_Status=HISTORY_SUFFICIENT,
-                    Data_Status=data_status, History_Quality=row.get("History_Quality"),
-                    BB_Breakout=bb_breakout, BB_Size_OK=bb_size_ok, HA_Strength_OK=ha_strength_ok,
-                    Primary_Signal=False, Price_Basis=symbol_price_basis,
-                ))
+                diagnostics_rows.append(
+                    _diagnostic_row(
+                        symbol,
+                        rec,
+                        Rows=len(df_clean),
+                        History_Status=HISTORY_SUFFICIENT,
+                        Data_Status=data_status,
+                        History_Quality=row.get("History_Quality"),
+                        BB_Breakout=bb_breakout,
+                        BB_Size_OK=bb_size_ok,
+                        HA_Strength_OK=ha_strength_ok,
+                        Primary_Signal=False,
+                        Price_Basis=symbol_price_basis,
+                    )
+                )
                 continue
 
-            check_pass_row(row["Close"], row["BB_Upper"], row["BB_Overshoot_Pct"], row["HA_Body_Pct"],
-                            cfg.baseline.max_bb_overshoot_pct, cfg.baseline.min_ha_body_pct)
+            check_pass_row(
+                row["Close"],
+                row["BB_Upper"],
+                row["BB_Overshoot_Pct"],
+                row["HA_Body_Pct"],
+                cfg.baseline.max_bb_overshoot_pct,
+                cfg.baseline.min_ha_body_pct,
+            )
 
             filter_result = apply_optional_filters(row, prev_row, cfg.filters)
             score_result = calculate_research_heuristic_score(row, benchmark_available=(benchmark_status == "OK"))
 
             out_row = {
                 "Signal_Date": last_bar_date_d.isoformat(),
-                "Symbol": symbol, "Stock": symbol,
+                "Symbol": symbol,
+                "Stock": symbol,
                 "Company_Name": getattr(rec, "Company_Name", symbol),
                 "Sector": getattr(rec, "Sector", None),
                 "CMP": row["Close"],
-                "BB_Middle": row["BB_Middle"], "BB_Upper": row["BB_Upper"], "BB_Lower": row["BB_Lower"],
-                "BB_StdDev": row["BB_StdDev"], "BB_Width_Pct": row["BB_Width_Pct"], "BB_PctB": row["BB_PctB"],
+                "BB_Middle": row["BB_Middle"],
+                "BB_Upper": row["BB_Upper"],
+                "BB_Lower": row["BB_Lower"],
+                "BB_StdDev": row["BB_StdDev"],
+                "BB_Width_Pct": row["BB_Width_Pct"],
+                "BB_PctB": row["BB_PctB"],
                 "BB_Overshoot_Pct": row["BB_Overshoot_Pct"],
-                "HA_Open": row["HA_Open"], "HA_Close": row["HA_Close"], "HA_Body_Pct": row["HA_Body_Pct"],
-                "ATR14": row.get(f"ATR{cfg.history.atr_period}"), "ATR_Pct": row["ATR_Pct"],
+                "HA_Open": row["HA_Open"],
+                "HA_Close": row["HA_Close"],
+                "HA_Body_Pct": row["HA_Body_Pct"],
+                "ATR14": row.get(f"ATR{cfg.history.atr_period}"),
+                "ATR_Pct": row["ATR_Pct"],
                 "BB_Overshoot_ATR": row["BB_Overshoot_ATR"],
-                "Volume": row["Volume"], "Volume_Ratio_20": row.get("Volume_Ratio_20"),
+                "Volume": row["Volume"],
+                "Volume_Ratio_20": row.get("Volume_Ratio_20"),
                 "Dollar_Volume": row.get("Dollar_Volume"),
-                "SMA20": row.get("SMA20"), "SMA50": row.get("SMA50"), "SMA200": row.get("SMA200"),
-                "Dist_SMA50_Pct": row.get("Dist_SMA50_Pct"), "Dist_SMA200_Pct": row.get("Dist_SMA200_Pct"),
-                "RS_20D": row.get("RS_20D"), "RS_60D": row.get("RS_60D"), "RS_120D": row.get("RS_120D"),
-                "Breakout_Type": row.get("Breakout_Type"), "Days_Above_Upper_BB": row.get("Days_Above_Upper_BB"),
+                "SMA20": row.get("SMA20"),
+                "SMA50": row.get("SMA50"),
+                "SMA200": row.get("SMA200"),
+                "Dist_SMA50_Pct": row.get("Dist_SMA50_Pct"),
+                "Dist_SMA200_Pct": row.get("Dist_SMA200_Pct"),
+                "RS_20D": row.get("RS_20D"),
+                "RS_60D": row.get("RS_60D"),
+                "RS_120D": row.get("RS_120D"),
+                "Breakout_Type": row.get("Breakout_Type"),
+                "Days_Above_Upper_BB": row.get("Days_Above_Upper_BB"),
                 "Market_Regime": row.get("Market_Regime"),
-                "Rows": len(df_clean), "History_Status": HISTORY_SUFFICIENT,
-                "Data_Status": data_status, "History_Quality": row.get("History_Quality"),
-                "Benchmark_Status": benchmark_status, "Score_Status": score_result.status,
+                "Rows": len(df_clean),
+                "History_Status": HISTORY_SUFFICIENT,
+                "Data_Status": data_status,
+                "History_Quality": row.get("History_Quality"),
+                "Benchmark_Status": benchmark_status,
+                "Score_Status": score_result.status,
                 "Research_Heuristic_Score": score_result.score,
                 "Price_Basis": symbol_price_basis,
-                "BB_Breakout": bb_breakout, "BB_Size_OK": bb_size_ok, "HA_Strength_OK": ha_strength_ok,
-                "Primary_Signal": True, "Optional_Filter_Status": filter_result.optional_pass,
+                "BB_Breakout": bb_breakout,
+                "BB_Size_OK": bb_size_ok,
+                "HA_Strength_OK": ha_strength_ok,
+                "Primary_Signal": True,
+                "Optional_Filter_Status": filter_result.optional_pass,
                 "Optional_Filters_Passed": filter_result.optional_pass,
-                "Failure_Category": None, "Failure_Reason": None,
+                "Failure_Category": None,
+                "Failure_Reason": None,
                 "Signal_Reason": build_signal_reason(row),
             }
             diagnostics_rows.append(out_row)
@@ -240,32 +299,57 @@ def run_scan(cfg: ScannerConfig, universe_provider: UniverseProvider, data_provi
             # disagree), never routine — always logged loudly and bucketed separately from
             # ordinary data-validation failures.
             security_scan_failures += 1
-            log_failure(logger, run_id=run_id, security=symbol, stage="sanity_gate",
-                        provider=data_provider.name, exc=e)
-            diagnostics_rows.append(_diagnostic_row(
-                symbol, rec, Failure_Category=FAILURE_SECURITY_SCAN, Failure_Reason=str(e),
-            ))
-            scan_log_rows.append({"security": symbol, "stage": "sanity_gate", "provider": data_provider.name,
-                                   "failure_category": FAILURE_SECURITY_SCAN,
-                                   "exception_type": type(e).__name__, "exception_message": str(e),
-                                   "timestamp": datetime.now().isoformat()})
+            log_failure(logger, run_id=run_id, security=symbol, stage="sanity_gate", provider=data_provider.name, exc=e)
+            diagnostics_rows.append(
+                _diagnostic_row(
+                    symbol,
+                    rec,
+                    Failure_Category=FAILURE_SECURITY_SCAN,
+                    Failure_Reason=str(e),
+                )
+            )
+            scan_log_rows.append(
+                {
+                    "security": symbol,
+                    "stage": "sanity_gate",
+                    "provider": data_provider.name,
+                    "failure_category": FAILURE_SECURITY_SCAN,
+                    "exception_type": type(e).__name__,
+                    "exception_message": str(e),
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
 
         except Exception as e:  # noqa: BLE001 - per-symbol isolation is the point (PART 15)
             security_scan_failures += 1
             log_failure(logger, run_id=run_id, security=symbol, stage="scan", provider=data_provider.name, exc=e)
-            diagnostics_rows.append(_diagnostic_row(
-                symbol, rec, Failure_Category=FAILURE_SECURITY_SCAN, Failure_Reason=str(e),
-            ))
-            scan_log_rows.append({"security": symbol, "stage": "scan", "provider": data_provider.name,
-                                   "failure_category": FAILURE_SECURITY_SCAN,
-                                   "exception_type": type(e).__name__, "exception_message": str(e),
-                                   "timestamp": datetime.now().isoformat()})
+            diagnostics_rows.append(
+                _diagnostic_row(
+                    symbol,
+                    rec,
+                    Failure_Category=FAILURE_SECURITY_SCAN,
+                    Failure_Reason=str(e),
+                )
+            )
+            scan_log_rows.append(
+                {
+                    "security": symbol,
+                    "stage": "scan",
+                    "provider": data_provider.name,
+                    "failure_category": FAILURE_SECURITY_SCAN,
+                    "exception_type": type(e).__name__,
+                    "exception_message": str(e),
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
 
     if insufficient_history_count:
         logger.info(
             "%d/%d universe symbols skipped: insufficient local history (< %d rows). "
             "Run scripts/bootstrap_history.py if this is a freshly-installed database.",
-            insufficient_history_count, len(constituents), cfg.history.min_rows_primary,
+            insufficient_history_count,
+            len(constituents),
+            cfg.history.min_rows_primary,
         )
 
     # Summarize the price basis actually observed across the universe (PART: "price basis
@@ -291,8 +375,11 @@ def run_scan(cfg: ScannerConfig, universe_provider: UniverseProvider, data_provi
 
     universe_count = len(constituents)
     n_current = int((diagnostics_df["Data_Status"] == DataStatus.CURRENT).sum()) if not diagnostics_df.empty else 0
-    n_stale = int((diagnostics_df["Data_Status"].isin(
-        [DataStatus.STALE_1_SESSION, DataStatus.STALE_2_PLUS])).sum()) if not diagnostics_df.empty else 0
+    n_stale = (
+        int((diagnostics_df["Data_Status"].isin([DataStatus.STALE_1_SESSION, DataStatus.STALE_2_PLUS])).sum())
+        if not diagnostics_df.empty
+        else 0
+    )
 
     # RUN_HEALTH is driven ONLY by whether the baseline BB+HA scan itself is trustworthy — the
     # baseline does not require a benchmark. Benchmark unavailability can only cap the result at
@@ -311,31 +398,44 @@ def run_scan(cfg: ScannerConfig, universe_provider: UniverseProvider, data_provi
     expected_session_str = (
         session.expected_completed_session.isoformat() if session.expected_completed_session else None
     )
-    data_health_df = pd.DataFrame([{
-        "Run_Date": session.as_of_date.isoformat(),
-        "Expected_Session": expected_session_str,
-        "Universe_Status": "VALID",
-        "Universe_Count": universe_count,
-        "Data_Current": n_current,
-        "Data_Stale": n_stale,
-        "Data_Validation_Failures": data_validation_failures,
-        "Security_Scan_Failures": security_scan_failures,
-        "Insufficient_History_Count": insufficient_history_count,
-        "Needs_Bootstrap": needs_bootstrap,
-        "Benchmark_Status": benchmark_status,
-        "Price_Basis": price_basis,
-        "Signal_Count": len(signals_df),
-        "RUN_HEALTH": run_health,
-    }])
+    data_health_df = pd.DataFrame(
+        [
+            {
+                "Run_Date": session.as_of_date.isoformat(),
+                "Expected_Session": expected_session_str,
+                "Universe_Status": "VALID",
+                "Universe_Count": universe_count,
+                "Data_Current": n_current,
+                "Data_Stale": n_stale,
+                "Data_Validation_Failures": data_validation_failures,
+                "Security_Scan_Failures": security_scan_failures,
+                "Insufficient_History_Count": insufficient_history_count,
+                "Needs_Bootstrap": needs_bootstrap,
+                "Benchmark_Status": benchmark_status,
+                "Price_Basis": price_basis,
+                "Signal_Count": len(signals_df),
+                "RUN_HEALTH": run_health,
+            }
+        ]
+    )
 
-    parameters_df = pd.DataFrame([{
-        "strategy_id": cfg.baseline.strategy_id, "bb_period": cfg.baseline.bb_period,
-        "bb_std_mult": cfg.baseline.bb_std_mult, "bb_ddof": cfg.baseline.bb_ddof,
-        "max_bb_overshoot_pct": cfg.baseline.max_bb_overshoot_pct, "min_ha_body_pct": cfg.baseline.min_ha_body_pct,
-        "atr_period": cfg.history.atr_period, "universe_scope": cfg.universe.universe_scope,
-        "entry_price_method": cfg.research.entry_price_method, "price_basis": price_basis,
-        "data_provider": data_provider.name,
-    }])
+    parameters_df = pd.DataFrame(
+        [
+            {
+                "strategy_id": cfg.baseline.strategy_id,
+                "bb_period": cfg.baseline.bb_period,
+                "bb_std_mult": cfg.baseline.bb_std_mult,
+                "bb_ddof": cfg.baseline.bb_ddof,
+                "max_bb_overshoot_pct": cfg.baseline.max_bb_overshoot_pct,
+                "min_ha_body_pct": cfg.baseline.min_ha_body_pct,
+                "atr_period": cfg.history.atr_period,
+                "universe_scope": cfg.universe.universe_scope,
+                "entry_price_method": cfg.research.entry_price_method,
+                "price_basis": price_basis,
+                "data_provider": data_provider.name,
+            }
+        ]
+    )
 
     universe_df = constituents.copy()
     scan_log_df = pd.DataFrame(scan_log_rows)
@@ -343,25 +443,46 @@ def run_scan(cfg: ScannerConfig, universe_provider: UniverseProvider, data_provi
     market_regime_rows = []
     if index_features is not None and not index_features.empty:
         last_idx = index_features.iloc[-1]
-        market_regime_rows.append({
-            "Index": cfg.benchmark.index_name, "Index_Close": last_idx["Index_Close"],
-            "Index_SMA50": last_idx["Index_SMA50"], "Index_SMA200": last_idx["Index_SMA200"],
-            "Market_Regime": last_idx["Market_Regime"],
-        })
+        market_regime_rows.append(
+            {
+                "Index": cfg.benchmark.index_name,
+                "Index_Close": last_idx["Index_Close"],
+                "Index_SMA50": last_idx["Index_SMA50"],
+                "Index_SMA200": last_idx["Index_SMA200"],
+                "Market_Regime": last_idx["Market_Regime"],
+            }
+        )
     market_regime_df = pd.DataFrame(market_regime_rows)
 
     sheets = ReportSheets(
-        live_signals=signals_df, stale_signals=stale_df, diagnostics=diagnostics_df,
-        data_health=data_health_df, scan_log=scan_log_df, universe=universe_df, parameters=parameters_df,
-        market_regime=market_regime_df, research_summary=pd.DataFrame(), forward_returns=pd.DataFrame(),
+        live_signals=signals_df,
+        stale_signals=stale_df,
+        diagnostics=diagnostics_df,
+        data_health=data_health_df,
+        scan_log=scan_log_df,
+        universe=universe_df,
+        parameters=parameters_df,
+        market_regime=market_regime_df,
+        research_summary=pd.DataFrame(),
+        forward_returns=pd.DataFrame(),
         sensitivity=pd.DataFrame(),
     )
 
     return ScanRunResult(
-        run_id=run_id, sheets=sheets, session=session, universe_source=universe_source,
-        universe_retrieved_at=retrieved_at, constituent_count=universe_count, benchmark_status=benchmark_status,
-        price_basis=price_basis, signals_current=len(signals_df), signals_stale=n_stale, run_health=run_health,
-        data_validation_failures=data_validation_failures, security_scan_failures=security_scan_failures,
-        insufficient_history_count=insufficient_history_count, needs_bootstrap=needs_bootstrap,
+        run_id=run_id,
+        sheets=sheets,
+        session=session,
+        universe_source=universe_source,
+        universe_retrieved_at=retrieved_at,
+        constituent_count=universe_count,
+        benchmark_status=benchmark_status,
+        price_basis=price_basis,
+        signals_current=len(signals_df),
+        signals_stale=n_stale,
+        run_health=run_health,
+        data_validation_failures=data_validation_failures,
+        security_scan_failures=security_scan_failures,
+        insufficient_history_count=insufficient_history_count,
+        needs_bootstrap=needs_bootstrap,
         failures=scan_log_rows,
     )
