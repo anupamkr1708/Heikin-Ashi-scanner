@@ -1,5 +1,52 @@
 # Changelog
 
+## 1.4.0 — mainboard universe semantics: diagnostics, deterministic dedup, inert exclusion hook
+
+Forensic specification exercise + scoped implementation (see
+`MAINBOARD_UNIVERSE_SEMANTICS_NOTES.md` for the full evidence matrix, sources, and universe
+contract). **The `NSE_MAINBOARD_EQ` inclusion predicate is unchanged** —
+`Series.isin(("EQ", "BE"))` — because the fields that would justify narrowing it (`DelFlg`,
+`PrtdToTrad`, `ElgbltyNrmlMkt`, `SctyStsNrmlMkt`) and the ETF/REIT/InvIT identifying mechanism
+remain genuinely unresolved. Nothing in this release claims otherwise.
+
+- **Added: cardinality/explainability diagnostics.** `compute_mainboard_diagnostics()` describes
+  (never filters) the raw-row → series-breakdown → EQ/BE → excluded → deduplicated → final
+  funnel, plus presence-detection for the still-unresolved diagnostic fields in a given file.
+  Exposed via `NSEMainboardEquityUniverseProvider.last_diagnostics` and
+  `UniverseSnapshot.diagnostics` (new, optional, default `None`).
+- **Fixed: deterministic EQ/BE identity resolution.** `deduplicate_mainboard()` replaces the
+  previous undocumented, file-row-order-dependent `drop_duplicates()` with an evidence-backed,
+  explainable EQ-preferred tie-break (confirmed this session against real NSE surveillance
+  circulars, independently corroborated by an unrelated open-source NSE integration's identical
+  `EQ > BE > BZ` convention). Does not change which symbols are included — only which row
+  represents an already-included symbol when both an EQ and BE row exist.
+- **Added: inert known-non-equity exclusion hook.** `excluded_symbols`/`excluded_isins` on
+  `NSEMainboardEquityUniverseProvider`, both default `frozenset()`. Proven byte-identical output
+  to before at the default (empty) setting; proven correct when populated — but shipped empty,
+  since no authoritative ETF/REIT/InvIT list is wired in yet. The most promising real mechanism
+  found this session (NSE's separately-published ETF security list, commonly
+  `eq_etfseclist.csv`, cross-referenced by symbol/ISIN — not a field inside the CM-MII security
+  master itself) is documented as the concrete next step, not implemented.
+- **New fixtures:** `generate_mainboard_semantics_fixture_cases()` — 11 synthetic (not real) rows
+  in real UDiFF raw-column shape, covering normal EQ, BE, ETF/REIT/InvIT-named rows (included,
+  not excluded — no authoritative filter exists), deleted, non-tradable, market-ineligible,
+  same-ISIN/different-symbol, series-changed, and other-instrument-class cases.
+- 18 new tests across `tests/unit/test_mainboard_diagnostics.py`,
+  `tests/unit/test_mainboard_deterministic_dedup.py`,
+  `tests/integration/test_mainboard_known_non_equity_exclusion.py` — including an explicit
+  regression proving the default (empty) exclusion sets change nothing versus before this release.
+
+Not implemented, explicitly out of scope: any change to the EQ/BE inclusion predicate; any
+`DelFlg`/`PrtdToTrad`/`ElgbltyNrmlMkt`/`SctyStsNrmlMkt` filtering; any ETF/REIT/InvIT filtering
+(heuristic or otherwise); ISIN-based identity/dedup; point-in-time security-master support. All
+existing survivorship-bias/current-vs-historical disclosures are unchanged.
+
+Full validation: 229/229 tests passed (211 baseline + 18 new), ruff check clean, ruff format
+clean, mypy clean (78 files), `git diff --check` clean,
+`python -m build --sdist --wheel --no-isolation` successful. Real-network validation against a
+live NSE security master was not possible from this sandbox (no network path to `nseindia.com`,
+re-confirmed by direct `curl`) — flagged rather than claimed.
+
 ## 1.3.2 — daily/run_scan benchmark as-of binding + security-master provenance fix
 
 Two independently forensically-verified research-integrity fixes (see
