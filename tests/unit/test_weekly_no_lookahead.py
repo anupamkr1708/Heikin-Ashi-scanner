@@ -11,10 +11,16 @@ def _daily_df_two_weeks():
     dates = pd.bdate_range("2026-08-31", "2026-09-11")
     n = len(dates)
     closes = np.linspace(100, 100 + n - 1, n)
-    return pd.DataFrame({
-        "Open": closes - 0.5, "High": closes + 1, "Low": closes - 1, "Close": closes,
-        "Volume": [1000] * n,
-    }, index=dates)
+    return pd.DataFrame(
+        {
+            "Open": closes - 0.5,
+            "High": closes + 1,
+            "Low": closes - 1,
+            "Close": closes,
+            "Volume": [1000] * n,
+        },
+        index=dates,
+    )
 
 
 def test_build_weekly_ohlc_aggregates_correctly():
@@ -31,7 +37,7 @@ def test_build_weekly_ohlc_aggregates_correctly():
     assert week1["Volume"] == week1_days["Volume"].sum()
 
     # Weekly bar is labeled by its LAST constituent trading day.
-    assert weekly.index[0].date() == date(2026, 9, 4)   # Friday of week 1
+    assert weekly.index[0].date() == date(2026, 9, 4)  # Friday of week 1
     assert weekly.index[1].date() == date(2026, 9, 11)  # Friday of week 2
 
 

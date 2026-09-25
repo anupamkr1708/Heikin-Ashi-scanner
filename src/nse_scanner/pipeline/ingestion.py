@@ -48,16 +48,20 @@ def _save_raw_copy(raw_dir: str | Path, session_date: date, content: str, schema
     return path, file_hash
 
 
-def ingest_session(session_date: date, store: MarketDataStore, raw_dir: str | Path,
-                    check_availability_first: bool = True) -> IngestionResult:
+def ingest_session(
+    session_date: date, store: MarketDataStore, raw_dir: str | Path, check_availability_first: bool = True
+) -> IngestionResult:
     """Ingests exactly one trading session's bhavcopy. Never silently substitutes an older
     session's data (continuation-prompt requirement: "Do NOT use D-1 data silently")."""
     if check_availability_first:
         availability: ReportAvailability = check_bhavcopy_availability(session_date)
         if not availability.available:
             return IngestionResult(
-                status=STATUS_WAITING_FOR_EOD_DATA, session_date=session_date, rows_ingested=0,
-                file_hash=None, raw_file_path=None,
+                status=STATUS_WAITING_FOR_EOD_DATA,
+                session_date=session_date,
+                rows_ingested=0,
+                file_hash=None,
+                raw_file_path=None,
                 detail=f"{availability.status}: {availability.detail or ''} ({availability.url_checked})",
             )
 
@@ -68,7 +72,11 @@ def ingest_session(session_date: date, store: MarketDataStore, raw_dir: str | Pa
 
     if result.session_date != session_date:
         return IngestionResult(
-            STATUS_FAILED, session_date, 0, result.file_hash, None,
+            STATUS_FAILED,
+            session_date,
+            0,
+            result.file_hash,
+            None,
             detail=f"retrieved report is for {result.session_date}, expected {session_date} — refusing to ingest",
         )
 
@@ -82,28 +90,39 @@ def ingest_session(session_date: date, store: MarketDataStore, raw_dir: str | Pa
         frame = frame[frame["Series"].astype(str).str.strip().str.upper().isin(("EQ", "BE"))]
 
     now = datetime.now(timezone.utc)
-    normalized = pd.DataFrame({
-        "nse_symbol": frame["NSE_Symbol"].astype(str).str.strip().str.upper(),
-        "isin": frame.get("ISIN"),
-        "trade_date": pd.Timestamp(session_date),
-        "open": pd.to_numeric(frame["Open"], errors="coerce"),
-        "high": pd.to_numeric(frame["High"], errors="coerce"),
-        "low": pd.to_numeric(frame["Low"], errors="coerce"),
-        "close": pd.to_numeric(frame["Close"], errors="coerce"),
-        "volume": pd.to_numeric(frame.get("Volume", 0), errors="coerce").fillna(0),
-        "turnover": pd.to_numeric(frame.get("Turnover"), errors="coerce") if "Turnover" in frame.columns else None,
-        "source": "NSE",
-        "price_basis": PriceBasis.RAW,
-        "schema_version": result.schema_version,
-        "ingested_at": now,
-    })
+    normalized = pd.DataFrame(
+        {
+            "nse_symbol": frame["NSE_Symbol"].astype(str).str.strip().str.upper(),
+            "isin": frame.get("ISIN"),
+            "trade_date": pd.Timestamp(session_date),
+            "open": pd.to_numeric(frame["Open"], errors="coerce"),
+            "high": pd.to_numeric(frame["High"], errors="coerce"),
+            "low": pd.to_numeric(frame["Low"], errors="coerce"),
+            "close": pd.to_numeric(frame["Close"], errors="coerce"),
+            "volume": pd.to_numeric(frame.get("Volume", 0), errors="coerce").fillna(0),
+            "turnover": pd.to_numeric(frame.get("Turnover"), errors="coerce") if "Turnover" in frame.columns else None,
+            "source": "NSE",
+            "price_basis": PriceBasis.RAW,
+            "schema_version": result.schema_version,
+            "ingested_at": now,
+        }
+    )
     normalized = normalized.dropna(subset=["open", "high", "low", "close"])
 
     row_count = store.append_eod_prices(normalized)
-    logger.info("Ingested %s: %d symbols (schema=%s, store now has %d total rows)",
-                session_date.isoformat(), len(normalized), result.schema_version, row_count)
+    logger.info(
+        "Ingested %s: %d symbols (schema=%s, store now has %d total rows)",
+        session_date.isoformat(),
+        len(normalized),
+        result.schema_version,
+        row_count,
+    )
 
     return IngestionResult(
-        status=STATUS_INGESTED, session_date=session_date, rows_ingested=len(normalized),
-        file_hash=file_hash, raw_file_path=str(raw_path), detail=f"schema={result.schema_version}",
+        status=STATUS_INGESTED,
+        session_date=session_date,
+        rows_ingested=len(normalized),
+        file_hash=file_hash,
+        raw_file_path=str(raw_path),
+        detail=f"schema={result.schema_version}",
     )

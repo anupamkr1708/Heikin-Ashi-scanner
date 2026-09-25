@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Thin launcher — see nse_scanner.cli.ingest_eod for the full implementation/docstring."""
+
 import sys
 from pathlib import Path
 

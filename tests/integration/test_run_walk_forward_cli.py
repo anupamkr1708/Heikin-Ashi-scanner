@@ -17,13 +17,23 @@ def _populate_store(tmp_path: Path, n_days: int = 500) -> None:
     universe_rows = []
     for sym in SYNTHETIC_SYMBOLS:
         hist = generate_synthetic_ohlcv(sym, n_days=n_days)
-        normalized = pd.DataFrame({
-            "nse_symbol": sym, "isin": None, "trade_date": hist.index,
-            "open": hist["Open"].to_numpy(), "high": hist["High"].to_numpy(),
-            "low": hist["Low"].to_numpy(), "close": hist["Close"].to_numpy(),
-            "volume": hist["Volume"].to_numpy(), "turnover": None,
-            "source": "NSE", "price_basis": "RAW", "schema_version": "UDIFF", "ingested_at": now,
-        })
+        normalized = pd.DataFrame(
+            {
+                "nse_symbol": sym,
+                "isin": None,
+                "trade_date": hist.index,
+                "open": hist["Open"].to_numpy(),
+                "high": hist["High"].to_numpy(),
+                "low": hist["Low"].to_numpy(),
+                "close": hist["Close"].to_numpy(),
+                "volume": hist["Volume"].to_numpy(),
+                "turnover": None,
+                "source": "NSE",
+                "price_basis": "RAW",
+                "schema_version": "UDIFF",
+                "ingested_at": now,
+            }
+        )
         store.append_eod_prices(normalized)
         universe_rows.append({"Symbol": sym, "Company_Name": f"{sym} Ltd", "Sector": "Test"})
     store.write_parquet("security_master_latest", pd.DataFrame(universe_rows))

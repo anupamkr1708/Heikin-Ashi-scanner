@@ -1,5 +1,137 @@
 # Changelog
 
+## 1.3.1 — P1 provider hardening: benchmark normalization + security-master discovery
+
+Fixes two concrete provider failures discovered by real execution against live yfinance and
+live nseindia.com (checkpoint scope only — see RESEARCH_INTEGRITY_V13_NOTES.md's companion P1
+notes for the full forensic report, live-network caveats, and what remains open).
+
+- **Fixed: benchmark normalization root cause.** `data/benchmark.py` collapsed any MultiIndex
+  column frame via `.get_level_values(0)` — correct only if level 0 happens to be the field
+  level. A real yfinance 1.7.0 response for `yf.download("^NSEI", group_by="ticker", ...)` came
+  back oriented `(Ticker, Price)` — level 0 = ticker — so the collapse produced five columns all
+  literally named `'^NSEI'`, guaranteeing "unexpected benchmark schema, missing column."
+  Replaced with `data/normalization.py::normalize_ticker_frame`, a canonical, provider-agnostic
+  normalizer that determines the field level FROM ITS VALUES (does it look like a set of OHLCV
+  field names?), never from position and never from a ticker-specific special case. Handles both
+  real observed orientations, single- and multi-ticker frames, `None`/empty input, and
+  unsupported/ambiguous MultiIndex shapes with a specific, actionable error
+  (`FrameNormalizationError`, new exception type) rather than a bare `KeyError`.
+  `Volume` is now explicitly optional (confirmed by inspection that nothing downstream reads it
+  from the benchmark frame) and a zero-volume index session (real observed example: 2026-09-22
+  `^NSEI`, Volume=0) is no longer conflated with missing/invalid data. The v1.3 as-of cutoff
+  (request-layer `end=`, response-layer post-filter) is unchanged and still enforced.
+  26 new tests (11 direct `normalize_ticker_frame` tests using the exact real dataframe shapes
+  from the production failure report, plus updated/added `YahooBenchmarkProvider` tests).
+
+- **Fixed: NSE security-master discovery, made more robust and far better diagnosed** (could not
+  be verified as fully resolved from this sandbox — see live-network caveat below).
+  Investigation (web search + direct fetch of the live "All Reports" page, since this sandbox
+  still has no direct network path to nseindia.com) found the `NSE_CM_security_ddmmyyyy.csv.gz`
+  filename is confirmed correct against a real NSE circular (NSE/MSD/60315) and that this report
+  is NOT discontinued — the "Discontinued... switch to UDiFF" notice on the live page belongs to
+  the legacy Bhavcopy CSV entries, not the security-file entries. Best-reasoned explanation for
+  the persistent 404 on exactly today's date: unlike the bhavcopy, a security/instrument master
+  file plausibly is not republished every session, only when something actually changes.
+  `data/nse_reports.py` is refactored into an explicit pipeline — `discover_report ->
+  resolve_download -> download_raw -> hash_raw -> validate_artifact -> parse (unchanged) ->
+  derive_mainboard (= filter_mainboard_equity, unchanged) -> snapshot` — where `discover_report`
+  now scans a bounded window of recent dates (not just today) and records every (template, date)
+  attempt with its specific outcome, surfaced in full on failure instead of "tried 3 URLs, all
+  404." Also newly defended against: NSE's anti-bot layer can return HTTP 200 with an HTML
+  block/captcha page instead of the file — `validate_artifact` catches this class of failure
+  (checked both at the cheap discovery-probe stage and post-download) before it would otherwise
+  silently reach the CSV parser. `UniverseSnapshot` (`universe/validation.py`) gained optional
+  fields (`source_url`, `file_hash`, `schema_version`, `raw_row_count`, `eligible_count`,
+  `definition`) so the security-master pipeline's `snapshot()` stage can carry full provenance
+  through the same record type NIFTY_200 already uses, rather than a parallel type. Fail-closed
+  behavior is unchanged and re-verified: no fallback to NIFTY_200, no hard-coded list, no stale
+  cache — `universe/mainboard.py`'s existing `UniverseIntegrityError` contract is untouched.
+  21 new tests covering discovery date-scanning, network-failure classification, the HTML
+  block-page defense, hash recording, and full pipeline orchestration with zero fallback on
+  total failure.
+
+- **Live-network caveat, stated plainly:** this sandbox's outbound network does not include
+  Yahoo Finance or nseindia.com (confirmed by direct attempts, not merely assumed — a live
+  `yf.download("^NSEI", ...)` call and a direct `curl` to `nsearchives.nseindia.com` were both
+  attempted and both blocked at the egress proxy). Every fix above is verified by code tracing
+  and an offline/mocked test suite using the exact real dataframe shapes and error text from the
+  production report — neither fix could be confirmed against the actual live endpoints from
+  here. The `update_universe.py --universe NSE_MAINBOARD_EQ` and benchmark provider were both
+  run for real against the live network from this sandbox specifically to prove the NEW discovery
+  pipeline's mechanics execute correctly end-to-end (date-scanning, rich per-attempt diagnostics,
+  fail-closed) — those runs show `UNREACHABLE (HTTP 403)`, which is this sandbox's own egress
+  block, not NSE's real response, and must not be read as confirmation the underlying 404/schema
+  issues are fixed against the real service.
+
+202 tests passing (was 181 at the start of this checkpoint), `ruff`/`mypy` clean, `sdist`+`wheel`
+build clean (pre-existing, unrelated `project.license` TOML-deprecation warning only).
+
+## 1.3.0 — v1.3 research-integrity audit: benchmark as-of leak, calendar, manifest provenance
+
+An external forensic audit against the full v1.3 research-integrity specification (P0 items:
+full codebase audit, as-of replay verification, future-data invariance, benchmark
+normalization, calendar correctness, data provenance). Findings and fixes below; see the audit
+report delivered alongside this release for the full PASS/WARN/FAIL table and what remains
+unverified.
+
+- **Fixed (highest-severity finding):** `data/benchmark.py::YahooBenchmarkProvider` always
+  called `yf.download(period=...)` with no upper date bound, regardless of caller.
+  `run_replay.py --as-of <past date>` used it unmodified, so a historical replay's
+  `Market_Regime`/`RS_20D`/`RS_60D`/`RS_120D` columns were computed from TODAY's live benchmark
+  data, not from what was actually available by the close of the replayed date — the exact
+  violation the `AsOfDataProvider` mechanism exists to prevent for stock data. Concrete
+  symptom: the Market_Regime sheet's `Index_Close` in a historical replay was silently today's
+  live index bar, not the replayed date's. `YahooBenchmarkProvider` now takes an `as_of_date`,
+  enforced at two independent layers (request `end=` param, response-layer post-filter),
+  mirroring `MarketDataStore`'s SQL cutoff. Disclosed residual limitation: this does not protect
+  against a provider retroactively revising an already-published adjusted close — the benchmark
+  path is not locally frozen the way stock history is. 13 new tests (11 direct unit tests for a
+  provider that previously had zero, 2 pipeline-level future-append-invariance tests).
+
+- **Fixed:** `config/nse_holidays.yaml`'s 2026 entry was a disclosed-as-partial 5-date
+  convenience default (this repository's original build sandbox had no network path to
+  nseindia.com). Replaced with the verified official NSE circular (Download Ref No.
+  NSE/CMTR/71775, 15 dates) plus one ad-hoc modification found during verification
+  (2026-01-15, Maharashtra municipal elections — corroborated by multiple independent
+  contemporary news reports; NOT in the primary annual circular, added via a later
+  modification). 16 dates total, each independently sourced and commented. Also removed a
+  dead constant (`_FIXED_DATE_HOLIDAYS_MMDD`, defined, zero call sites) that the old module
+  docstring implied was in use.
+
+- **Fixed:** `run_manifest_*.json` (the machine-readable, reproducible run record — PART 54)
+  was missing `benchmark_status`, data-quality counts, scan/signal counts, and (for
+  `run_daily.py`) the ingested file's SHA256 hash, across all four places a manifest gets
+  built. Every one of these values was already computed and printed to the console —
+  `IngestionResult.file_hash` in particular was computed, returned, and then discarded without
+  ever being printed OR persisted. Now threaded through via `build_run_manifest`'s `extra=`
+  field at all four call sites. Also fixed `offline_fixture.py` omitting `price_basis` entirely
+  (silently falling back to the config default instead of the actual basis returned).
+
+- **Fixed:** `ruff`/`mypy` were not actually clean despite `CODE_REVIEW.md` claiming so — a
+  trailing-newline `W292` in `config.py` and a missing `types-python-dateutil` mypy stub. Both
+  fixed; both tools now genuinely clean.
+
+- **Fixed:** version mismatch — `pyproject.toml` said `1.2.2`, `version.py`'s `__version__`
+  (what actually ends up in the run manifest's `software_version` field) said `1.2.0`. Both now
+  `1.3.0`.
+
+- **Confirmed correct (traced, not just read):** `AsOfDataProvider` → `MarketDataStore`'s SQL
+  `trade_date <= ?` cutoff for stock data is a genuine query-level guarantee, not just
+  documentation. Universe point-in-time handling (`research/survivorship.py`) is honestly
+  labeled `CURRENT_UNIVERSE_HISTORICAL_SIMULATION` with `SURVIVORSHIP_BIAS_PRESENT = True`
+  rather than claiming true point-in-time membership it doesn't have.
+
+- **Found, not yet fixed (documented in the audit report, not silently dropped):**
+  `data/provenance.py::ProvenanceRecord` is a well-designed dataclass matching PART 23's field
+  list closely, but has zero call sites anywhere in the codebase — aspirational/dead code, not
+  a wired-up mechanism. Per-row provenance in the actual `eod_prices` table covers `source`,
+  `price_basis`, `schema_version`, `ingested_at` but not `source_file_hash`/`ingestion_run_id`
+  as explicit columns (traceable back to the raw file only via the `trade_date`-based naming
+  convention, not an explicit link).
+
+162 tests passing (was 145 at the start of this audit), `ruff`/`mypy` clean.
+
 ## 1.2.2 — yfinance repair disabled by default (2nd missing-dependency hit)
 
 The 1.2.1 fix addressed `scipy`; the very next bootstrap run hit a DIFFERENT missing dependency

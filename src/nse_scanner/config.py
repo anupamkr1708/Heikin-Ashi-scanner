@@ -28,7 +28,7 @@ from nse_scanner.exceptions import ConfigurationError
 class BaselineStrategyConfig:
     bb_period: int = 20
     bb_std_mult: float = 2.0
-    bb_ddof: int = 1                 # 1 = sample std (pandas default), 0 = population std
+    bb_ddof: int = 1  # 1 = sample std (pandas default), 0 = population std
     max_bb_overshoot_pct: float = 4.0
     min_ha_body_pct: float = 1.0
     strategy_id: str = "bb_ha_v1_base"
@@ -40,7 +40,7 @@ class BaselineStrategyConfig:
 @dataclass(frozen=True)
 class HistoryTierConfig:
     atr_period: int = 14
-    min_rows_primary: int = 30       # covers BB(20) + ATR(14) + small buffer
+    min_rows_primary: int = 30  # covers BB(20) + ATR(14) + small buffer
     min_rows_sma20: int = 20
     min_rows_sma50: int = 50
     min_rows_sma200: int = 200
@@ -54,15 +54,15 @@ class HistoryTierConfig:
 # ---------------------------------------------------------------------------
 @dataclass(frozen=True)
 class OptionalFilterConfig:
-    use_trend_filter: bool = False              # Close > SMA50
-    use_long_trend_filter: bool = False          # Close > SMA200
-    use_volume_filter: bool = False              # Volume_Ratio_20 > 1.0
-    use_bandwidth_filter: bool = False           # BB width expanding vs. yesterday
-    use_atr_filter: bool = False                 # BB_Overshoot_ATR within band
-    use_candle_quality_filter: bool = False      # CLV >= threshold
-    use_relative_strength_filter: bool = False   # RS_20D > 0
-    use_market_regime_filter: bool = False       # benchmark regime == BULL
-    use_fresh_breakout_only: bool = False        # Breakout_Type == FRESH_BREAKOUT
+    use_trend_filter: bool = False  # Close > SMA50
+    use_long_trend_filter: bool = False  # Close > SMA200
+    use_volume_filter: bool = False  # Volume_Ratio_20 > 1.0
+    use_bandwidth_filter: bool = False  # BB width expanding vs. yesterday
+    use_atr_filter: bool = False  # BB_Overshoot_ATR within band
+    use_candle_quality_filter: bool = False  # CLV >= threshold
+    use_relative_strength_filter: bool = False  # RS_20D > 0
+    use_market_regime_filter: bool = False  # benchmark regime == BULL
+    use_fresh_breakout_only: bool = False  # Breakout_Type == FRESH_BREAKOUT
 
     atr_overshoot_max: float = 1.5
     candle_quality_min_clv: float = 0.5
@@ -76,21 +76,21 @@ class DataConfig:
     interval: str = "1d"
     yfinance_auto_adjust: bool = True
     yfinance_repair: bool = False  # yfinance's repair logic pulls in optional dependencies
-                                     # (scipy for one repair type, scikit-learn for another) that
-                                     # only surface as ModuleNotFoundError the first time repair
-                                     # actually finds something to fix — which can happen mid-run,
-                                     # symbol by symbol, rather than failing fast at install time.
-                                     # Off by default so a fresh install just works; both packages
-                                     # are still in pyproject.toml if you want to turn this back on.
+    # (scipy for one repair type, scikit-learn for another) that
+    # only surface as ModuleNotFoundError the first time repair
+    # actually finds something to fix — which can happen mid-run,
+    # symbol by symbol, rather than failing fast at install time.
+    # Off by default so a fresh install just works; both packages
+    # are still in pyproject.toml if you want to turn this back on.
     yfinance_keepna: bool = False
     yfinance_group_by: str = "ticker"
     yfinance_threads: bool = True
     yfinance_version_tested: str = "1.7.0"  # bumped from 0.2.40 after a real user hit
-                                              # yfinance 0.2.40 being rejected by Yahoo's current
-                                              # API (JSONDecodeError on every request) — this
-                                              # field is a recorded/reported value for the run
-                                              # manifest, not an enforced pin (see pyproject.toml)
-    price_basis: str = "ADJUSTED"        # ADJUSTED | RAW — must be explicit, never mixed
+    # yfinance 0.2.40 being rejected by Yahoo's current
+    # API (JSONDecodeError on every request) — this
+    # field is a recorded/reported value for the run
+    # manifest, not an enforced pin (see pyproject.toml)
+    price_basis: str = "ADJUSTED"  # ADJUSTED | RAW — must be explicit, never mixed
     max_allowed_data_lag_sessions: int = 1
     batch_size: int = 50
     batch_pause_sec: float = 1.0
@@ -105,7 +105,7 @@ class DataConfig:
 # ---------------------------------------------------------------------------
 @dataclass(frozen=True)
 class UniverseConfig:
-    universe_scope: str = "NIFTY_200"    # NIFTY_200 | NSE_MAINBOARD_EQ | ...
+    universe_scope: str = "NIFTY_200"  # NIFTY_200 | NSE_MAINBOARD_EQ | ...
     nifty200_min_count: int = 150
     nifty200_max_count: int = 210
     constituent_override_csv_path: str | None = None
@@ -128,11 +128,11 @@ class BenchmarkConfig:
 @dataclass(frozen=True)
 class ResearchConfig:
     run_research_mode: bool = False
-    entry_price_method: str = "next_open"     # next_open | next_close
+    entry_price_method: str = "next_open"  # next_open | next_close
     forward_return_horizons: tuple[int, ...] = (1, 3, 5, 10, 20, 40)
     primary_research_horizon: int = 5
-    independent_event_cooldown_days: int = 5   # cooldown after a FRESH_BREAKOUT before the next
-                                                # signal day can count as a new independent event
+    independent_event_cooldown_days: int = 5  # cooldown after a FRESH_BREAKOUT before the next
+    # signal day can count as a new independent event
     walk_forward_train_years: float = 3.0
     walk_forward_test_months: float = 6.0
     live_history_period: str = "2y"
@@ -151,7 +151,7 @@ class CostProfileConfig:
     stt_sell_pct: float = 0.10
     exchange_buy_pct: float = 0.0035
     exchange_sell_pct: float = 0.0035
-    gst_pct: float = 0.18            # applied on (brokerage + exchange), not on trade value
+    gst_pct: float = 0.18  # applied on (brokerage + exchange), not on trade value
     stamp_duty_buy_pct: float = 0.015
     stamp_duty_sell_pct: float = 0.0
     slippage_buy_pct: float = 0.05
@@ -159,12 +159,11 @@ class CostProfileConfig:
     dp_fee_flat: float = 0.0
 
     def round_trip_cost_pct(self) -> float:
-        buy_side = (self.brokerage_buy_pct + self.exchange_buy_pct + self.slippage_buy_pct
-                    + self.stamp_duty_buy_pct)
-        sell_side = (self.brokerage_sell_pct + self.exchange_sell_pct + self.slippage_sell_pct
-                     + self.stamp_duty_sell_pct)
-        gst = (self.brokerage_buy_pct + self.exchange_buy_pct
-               + self.brokerage_sell_pct + self.exchange_sell_pct) * self.gst_pct
+        buy_side = self.brokerage_buy_pct + self.exchange_buy_pct + self.slippage_buy_pct + self.stamp_duty_buy_pct
+        sell_side = self.brokerage_sell_pct + self.exchange_sell_pct + self.slippage_sell_pct + self.stamp_duty_sell_pct
+        gst = (
+            self.brokerage_buy_pct + self.exchange_buy_pct + self.brokerage_sell_pct + self.exchange_sell_pct
+        ) * self.gst_pct
         return buy_side + sell_side + gst + self.stt_buy_pct + self.stt_sell_pct
 
 
@@ -224,7 +223,13 @@ class ScannerConfig:
         if self.data.price_basis not in ("ADJUSTED", "RAW"):
             raise ConfigurationError("price_basis must be 'ADJUSTED' or 'RAW'")
         if self.universe.universe_scope not in (
-            "NIFTY_200", "NSE_MAINBOARD_EQ", "NSE_SME", "NSE_ETF", "NSE_REIT", "NSE_INVIT", "NSE_OTHER",
+            "NIFTY_200",
+            "NSE_MAINBOARD_EQ",
+            "NSE_SME",
+            "NSE_ETF",
+            "NSE_REIT",
+            "NSE_INVIT",
+            "NSE_OTHER",
         ):
             raise ConfigurationError(f"unknown universe_scope: {self.universe.universe_scope}")
 
@@ -271,7 +276,7 @@ def load_config(yaml_path: str | Path | None = None, cli_overrides: dict[str, An
     for env_key, env_val in os.environ.items():
         if not env_key.startswith(prefix):
             continue
-        parts = env_key[len(prefix):].lower().split("__")
+        parts = env_key[len(prefix) :].lower().split("__")
         if len(parts) != 2:
             continue
         section, field_name = parts

@@ -24,21 +24,23 @@ from nse_scanner.testing.synthetic_market_data import generate_synthetic_ohlcv
 def _ingest_as_nse(store: MarketDataStore, symbol: str, ohlcv: pd.DataFrame) -> None:
     """Mimics pipeline/ingestion.py's normalization, without needing a real bhavcopy file."""
     now = datetime.now(timezone.utc)
-    normalized = pd.DataFrame({
-        "nse_symbol": symbol,
-        "isin": None,
-        "trade_date": ohlcv.index,
-        "open": ohlcv["Open"].to_numpy(),
-        "high": ohlcv["High"].to_numpy(),
-        "low": ohlcv["Low"].to_numpy(),
-        "close": ohlcv["Close"].to_numpy(),
-        "volume": ohlcv["Volume"].to_numpy(),
-        "turnover": None,
-        "source": "NSE",
-        "price_basis": "RAW",
-        "schema_version": "UDIFF",
-        "ingested_at": now,
-    })
+    normalized = pd.DataFrame(
+        {
+            "nse_symbol": symbol,
+            "isin": None,
+            "trade_date": ohlcv.index,
+            "open": ohlcv["Open"].to_numpy(),
+            "high": ohlcv["High"].to_numpy(),
+            "low": ohlcv["Low"].to_numpy(),
+            "close": ohlcv["Close"].to_numpy(),
+            "volume": ohlcv["Volume"].to_numpy(),
+            "turnover": None,
+            "source": "NSE",
+            "price_basis": "RAW",
+            "schema_version": "UDIFF",
+            "ingested_at": now,
+        }
+    )
     store.append_eod_prices(normalized)
 
 
@@ -75,8 +77,10 @@ def test_asof_provider_cannot_see_data_ingested_after_the_cutoff(tmp_path):
 def test_asof_provider_excludes_data_strictly_after_cutoff_date():
     """A more surgical check: the cutoff boundary itself is inclusive of as_of but not beyond."""
     import tempfile
+
     with tempfile.TemporaryDirectory() as tmp:
         from pathlib import Path
+
         store = MarketDataStore(Path(tmp) / "processed", Path(tmp) / "db.duckdb")
         history = generate_synthetic_ohlcv("BOUNDARYTEST", n_days=40)
         _ingest_as_nse(store, "BOUNDARYTEST", history)
@@ -146,8 +150,7 @@ def test_full_run_scan_pipeline_via_asof_provider_is_immutable_to_future_ingesti
         # series) as opposed to calling the generator twice with different lengths, which
         # reassigns which calendar date each price lands on and is NOT a valid test of anything.
         full_histories = {
-            sym: generate_synthetic_ohlcv(sym, n_days=100,
-                                           engineer_breakout_on_last_day=(sym == "ALPHATEST"))
+            sym: generate_synthetic_ohlcv(sym, n_days=100, engineer_breakout_on_last_day=(sym == "ALPHATEST"))
             for sym in ["ALPHATEST", "BETATEST", "GAMMATEST"]
         }
         for sym, full_hist in full_histories.items():
@@ -160,8 +163,14 @@ def test_full_run_scan_pipeline_via_asof_provider_is_immutable_to_future_ingesti
         cfg = ScannerConfig()
         session = SessionInfo(cutoff, cutoff, cutoff, cutoff)
         provider_before = AsOfDataProvider(as_of_date=cutoff, store=store)
-        result_before = run_scan(cfg, InMemoryUniverseProvider(universe_df), provider_before,
-                                  benchmark_provider=None, session=session, holidays=set())
+        result_before = run_scan(
+            cfg,
+            InMemoryUniverseProvider(universe_df),
+            provider_before,
+            benchmark_provider=None,
+            session=session,
+            holidays=set(),
+        )
         live_before = result_before.sheets.live_signals.copy()
         diag_before = result_before.sheets.diagnostics.copy()
 
@@ -171,8 +180,14 @@ def test_full_run_scan_pipeline_via_asof_provider_is_immutable_to_future_ingesti
             _ingest_as_nse(store, sym, full_hist.iloc[70:])
 
         provider_after = AsOfDataProvider(as_of_date=cutoff, store=store)
-        result_after = run_scan(cfg, InMemoryUniverseProvider(universe_df), provider_after,
-                                 benchmark_provider=None, session=session, holidays=set())
+        result_after = run_scan(
+            cfg,
+            InMemoryUniverseProvider(universe_df),
+            provider_after,
+            benchmark_provider=None,
+            session=session,
+            holidays=set(),
+        )
         live_after = result_after.sheets.live_signals.copy()
         diag_after = result_after.sheets.diagnostics.copy()
 

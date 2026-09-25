@@ -26,7 +26,7 @@ import pandas as pd
 class CorporateActionRecord:
     isin: str
     nse_symbol: str
-    action_type: str         # SPLIT | BONUS | RIGHTS | DIVIDEND | MERGER | SYMBOL_CHANGE | OTHER
+    action_type: str  # SPLIT | BONUS | RIGHTS | DIVIDEND | MERGER | SYMBOL_CHANGE | OTHER
     ex_date: date
     ratio_or_amount: str | None
     source: str
@@ -47,8 +47,7 @@ def flag_large_gaps(df: pd.DataFrame, gap_threshold_pct: float = 10.0) -> pd.Dat
     return out
 
 
-def reconcile_with_ca_calendar(gapped_df: pd.DataFrame, ca_records: list[CorporateActionRecord]
-                                ) -> pd.DataFrame:
+def reconcile_with_ca_calendar(gapped_df: pd.DataFrame, ca_records: list[CorporateActionRecord]) -> pd.DataFrame:
     """Marks `corporate_action_flag = True` on any date matching a known CA ex-date, and
     recomputes `price_discontinuity_flag` accordingly. Pure function — takes an explicit CA
     record list rather than fetching one, so it works identically in tests and in production

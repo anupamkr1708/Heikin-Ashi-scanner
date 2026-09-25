@@ -50,15 +50,21 @@ logger = get_logger(__name__)
 def build_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="NSE EOD/T-1 Technical Scanner — one-command daily run")
     p.add_argument("--date", type=str, default=None, help="Force a specific session date (YYYY-MM-DD)")
-    p.add_argument("--offline-fixture", action="store_true",
-                    help="Use tests/fixtures/nse/* instead of live NSE/yfinance — no network required")
+    p.add_argument(
+        "--offline-fixture",
+        action="store_true",
+        help="Use tests/fixtures/nse/* instead of live NSE/yfinance — no network required",
+    )
     p.add_argument("--universe", type=str, default=None, help="Override universe_scope (e.g. NIFTY_200)")
     p.add_argument("--config", type=str, default="config/default.yaml", help="Path to YAML config")
     p.add_argument("--skip-ingest", action="store_true", help="Skip EOD ingestion, scan existing local data only")
-    p.add_argument("--allow-missing-holidays", action="store_true",
-                    help="Degrade to a weekday-only calendar instead of blocking when "
-                         "config/nse_holidays.yaml is missing a required year (NOT recommended "
-                         "for a production run — see README)")
+    p.add_argument(
+        "--allow-missing-holidays",
+        action="store_true",
+        help="Degrade to a weekday-only calendar instead of blocking when "
+        "config/nse_holidays.yaml is missing a required year (NOT recommended "
+        "for a production run — see README)",
+    )
     return p
 
 
@@ -73,9 +79,11 @@ def main(argv: list[str] | None = None) -> int:
 
     store = MarketDataStore(cfg.paths.processed_dir, cfg.paths.duckdb_path)
 
-    now_ist = datetime.now(IST) if args.date is None else datetime.combine(
-        date.fromisoformat(args.date), datetime.min.time(), tzinfo=IST
-    ).replace(hour=16)  # forced-date mode treats the date as already-closed for session purposes
+    now_ist = (
+        datetime.now(IST)
+        if args.date is None
+        else datetime.combine(date.fromisoformat(args.date), datetime.min.time(), tzinfo=IST).replace(hour=16)
+    )  # forced-date mode treats the date as already-closed for session purposes
 
     # Production default is STRICT: a missing required holiday year blocks the run rather than
     # silently falling back to a weekday-only calendar. --offline-fixture never touches the real
@@ -90,9 +98,11 @@ def main(argv: list[str] | None = None) -> int:
         print("=" * 70)
         print(str(e))
         print()
-        print("Re-run with --allow-missing-holidays to proceed anyway with a weekday-only "
-              "calendar (staleness detection will be less precise around holidays), or "
-              "--offline-fixture to test without touching the real calendar at all.")
+        print(
+            "Re-run with --allow-missing-holidays to proceed anyway with a weekday-only "
+            "calendar (staleness detection will be less precise around holidays), or "
+            "--offline-fixture to test without touching the real calendar at all."
+        )
         return 5
 
     session = resolve_session(now_ist, holidays)
@@ -109,6 +119,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.offline_fixture:
         print("MODE: OFFLINE FIXTURE (no network) — see tests/fixtures/nse/")
         from nse_scanner.offline_fixture import run_offline_fixture_scan
+
         return run_offline_fixture_scan(cfg, session, store)
 
     if not args.skip_ingest:
@@ -134,8 +145,15 @@ def main(argv: list[str] | None = None) -> int:
     benchmark_provider = YahooBenchmarkProvider(cfg.data)
 
     try:
-        result = run_scan(cfg, universe_provider, data_provider, benchmark_provider, session, holidays,
-                           symbol_override_path="config/symbol_overrides.yaml")
+        result = run_scan(
+            cfg,
+            universe_provider,
+            data_provider,
+            benchmark_provider,
+            session,
+            holidays,
+            symbol_override_path="config/symbol_overrides.yaml",
+        )
     except UniverseIntegrityError as e:
         print("UNIVERSE INTEGRITY FAILURE — ABORTING RUN (no partial-universe fallback).")
         print(str(e))
@@ -148,13 +166,33 @@ def main(argv: list[str] | None = None) -> int:
     write_report(result.sheets, report_path)
 
     manifest = build_run_manifest(
-        run_id=result.run_id, cfg=cfg, universe_id=cfg.universe.universe_scope,
-        universe_snapshot_date=session.as_of_date.isoformat(), universe_source=result.universe_source,
-        constituent_count=result.constituent_count, data_provider=data_provider.name,
+        run_id=result.run_id,
+        cfg=cfg,
+        universe_id=cfg.universe.universe_scope,
+        universe_snapshot_date=session.as_of_date.isoformat(),
+        universe_source=result.universe_source,
+        constituent_count=result.constituent_count,
+        data_provider=data_provider.name,
         data_as_of=session.expected_completed_session.isoformat(),
         expected_session=session.expected_completed_session.isoformat(),
-        signal_date=session.signal_date.isoformat(), status=result.run_health,
+        signal_date=session.signal_date.isoformat(),
+        status=result.run_health,
         price_basis=result.price_basis,
+        # PART 54 requires the manifest (the machine-readable record) to carry these — they were
+        # already being computed (ScanRunResult / IngestionResult) and printed to the console
+        # below, but previously silently dropped rather than written to run_manifest_*.json.
+        # Found + fixed during the v1.3 research-integrity audit.
+        extra={
+            "data_file_hash": ingestion_result.file_hash if not args.skip_ingest else None,
+            "data_file_path": ingestion_result.raw_file_path if not args.skip_ingest else None,
+            "benchmark_status": result.benchmark_status,
+            "data_validation_failures": result.data_validation_failures,
+            "insufficient_history_count": result.insufficient_history_count,
+            "security_scan_failures": result.security_scan_failures,
+            "signals_current": result.signals_current,
+            "signals_stale": result.signals_stale,
+            "needs_bootstrap": result.needs_bootstrap,
+        },
     )
     manifest_path = Path(cfg.paths.reports_dir) / f"run_manifest_{session.signal_date.isoformat()}.json"
     manifest.write(manifest_path)
@@ -163,8 +201,10 @@ def main(argv: list[str] | None = None) -> int:
     print(f"UNIVERSE:                    {result.constituent_count} ({result.universe_source})")
     print(f"PRICE BASIS:                 {result.price_basis}")
     print(f"BENCHMARK:                   {result.benchmark_status}")
-    print(f"DATA VALIDATION FAILURES:    {result.data_validation_failures}"
-          f" (of which insufficient-history: {result.insufficient_history_count})")
+    print(
+        f"DATA VALIDATION FAILURES:    {result.data_validation_failures}"
+        f" (of which insufficient-history: {result.insufficient_history_count})"
+    )
     print(f"SECURITY SCAN FAILURES:      {result.security_scan_failures}")
     print(f"CURRENT SIGNALS:             {result.signals_current}")
     print(f"STALE CANDIDATES:            {result.signals_stale}")
@@ -175,8 +215,11 @@ def main(argv: list[str] | None = None) -> int:
     if result.needs_bootstrap:
         print("-" * 70)
         print("NOTICE: most of the universe has insufficient local history for the baseline")
-        print("strategy (< {} rows). This is expected on a freshly-installed database — the".format(
-            cfg.history.min_rows_primary))
+        print(
+            "strategy (< {} rows). This is expected on a freshly-installed database — the".format(
+                cfg.history.min_rows_primary
+            )
+        )
         print("scanner does not claim to have current technical signals until enough history")
         print("has been populated. Run this once:")
         print()

@@ -1,16 +1,16 @@
 """Survivorship-bias mode labeling (PART 29).
 
-    MODE_A: CURRENT_UNIVERSE_HISTORICAL_SIMULATION
-        Today's constituent list applied backward through history. Discloses survivorship bias
-        explicitly — securities that were delisted/removed/renamed are absent from the whole
-        study, not just from the periods after their removal.
+MODE_A: CURRENT_UNIVERSE_HISTORICAL_SIMULATION
+    Today's constituent list applied backward through history. Discloses survivorship bias
+    explicitly — securities that were delisted/removed/renamed are absent from the whole
+    study, not just from the periods after their removal.
 
-    MODE_B: POINT_IN_TIME_NIFTY_200
-        Requires actual historical membership records (universe_id, snapshot_date, isin,
-        membership_start, membership_end, source). This repository does not have a verified
-        historical-membership feed wired up (PART 89/limitations), so MODE_B is implemented as a
-        data contract + validator here; it will raise if fed anything that isn't genuinely
-        point-in-time, rather than silently accepting a current-universe list mislabeled as MODE_B.
+MODE_B: POINT_IN_TIME_NIFTY_200
+    Requires actual historical membership records (universe_id, snapshot_date, isin,
+    membership_start, membership_end, source). This repository does not have a verified
+    historical-membership feed wired up (PART 89/limitations), so MODE_B is implemented as a
+    data contract + validator here; it will raise if fed anything that isn't genuinely
+    point-in-time, rather than silently accepting a current-universe list mislabeled as MODE_B.
 """
 
 from __future__ import annotations
@@ -55,7 +55,7 @@ def validate_point_in_time_membership(membership_df: pd.DataFrame) -> Survivorsh
     return SurvivorshipLabel(
         mode=MODE_B_POINT_IN_TIME,
         disclosure="Point-in-time membership records validated; results reflect actual historical "
-                    "index composition, not today's constituents applied backward.",
+        "index composition, not today's constituents applied backward.",
     )
 
 

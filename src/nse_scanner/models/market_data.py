@@ -28,8 +28,8 @@ class NormalizedBarMeta(BaseModel):
 
     isin: str | None
     nse_symbol: str
-    source: str                 # "NSE" | "YFINANCE"
-    price_basis: str            # PriceBasis.RAW | PriceBasis.ADJUSTED
+    source: str  # "NSE" | "YFINANCE"
+    price_basis: str  # PriceBasis.RAW | PriceBasis.ADJUSTED
     interval: str = "1d"
     retrieved_at: datetime | None = None
     provider_version: str | None = None

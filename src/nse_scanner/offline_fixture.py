@@ -43,9 +43,15 @@ class InMemoryDataProvider(DataProvider):
         df = self.histories.get(symbol)
         if df is None:
             return None, None, "no synthetic history for this symbol"
-        meta = NormalizedBarMeta(isin=None, nse_symbol=symbol, source=self.name,
-                                  price_basis=PriceBasis.RAW, interval=interval,
-                                  retrieved_at=datetime.now(timezone.utc), provider_version="synthetic")
+        meta = NormalizedBarMeta(
+            isin=None,
+            nse_symbol=symbol,
+            source=self.name,
+            price_basis=PriceBasis.RAW,
+            interval=interval,
+            retrieved_at=datetime.now(timezone.utc),
+            provider_version="synthetic",
+        )
         return df, meta, None
 
     def fetch_history_batch(self, symbols: list[str], period: str, interval: str):
@@ -94,23 +100,42 @@ def run_offline_fixture_scan(cfg: ScannerConfig, session: SessionInfo, store: Ma
     # classification behaves sensibly against synthetic (non-calendar-aligned) dates.
     last_date = max(df.index[-1] for df in histories.values())
     synthetic_session = SessionInfo(
-        as_of_date=session.as_of_date, expected_completed_session=last_date.date(),
-        signal_date=last_date.date(), planned_entry_date=session.planned_entry_date,
+        as_of_date=session.as_of_date,
+        expected_completed_session=last_date.date(),
+        signal_date=last_date.date(),
+        planned_entry_date=session.planned_entry_date,
     )
 
-    result = run_scan(cfg, universe_provider, data_provider, benchmark_provider, synthetic_session,
-                       holidays=set())
+    result = run_scan(cfg, universe_provider, data_provider, benchmark_provider, synthetic_session, holidays=set())
 
     fname = f"NSE_Technical_Scanner_OFFLINE_FIXTURE_{last_date.date().isoformat()}.xlsx"
     report_path = Path(cfg.paths.reports_dir) / fname
     write_report(result.sheets, report_path)
     manifest = build_run_manifest(
-        run_id=result.run_id, cfg=cfg, universe_id="SYNTHETIC_FIXTURE",
-        universe_snapshot_date=session.as_of_date.isoformat(), universe_source=result.universe_source,
-        constituent_count=result.constituent_count, data_provider=data_provider.name,
-        data_as_of=last_date.date().isoformat(), expected_session=last_date.date().isoformat(),
-        signal_date=last_date.date().isoformat(), status=result.run_health,
-        extra={"mode": "OFFLINE_FIXTURE", "note": "synthetic data, not real NSE data"},
+        run_id=result.run_id,
+        cfg=cfg,
+        universe_id="SYNTHETIC_FIXTURE",
+        universe_snapshot_date=session.as_of_date.isoformat(),
+        universe_source=result.universe_source,
+        constituent_count=result.constituent_count,
+        data_provider=data_provider.name,
+        data_as_of=last_date.date().isoformat(),
+        expected_session=last_date.date().isoformat(),
+        signal_date=last_date.date().isoformat(),
+        status=result.run_health,
+        price_basis=result.price_basis,  # was omitted; fell back to cfg default instead of the
+        # actual basis the (synthetic) provider returned
+        # See cli/run_daily.py for why these are here (v1.3 audit finding).
+        extra={
+            "mode": "OFFLINE_FIXTURE",
+            "note": "synthetic data, not real NSE data",
+            "benchmark_status": result.benchmark_status,
+            "data_validation_failures": result.data_validation_failures,
+            "insufficient_history_count": result.insufficient_history_count,
+            "security_scan_failures": result.security_scan_failures,
+            "signals_current": result.signals_current,
+            "signals_stale": result.signals_stale,
+        },
     )
     manifest_path = Path(cfg.paths.reports_dir) / "run_manifest_OFFLINE_FIXTURE.json"
     manifest.write(manifest_path)

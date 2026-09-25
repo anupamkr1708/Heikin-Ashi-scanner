@@ -23,7 +23,8 @@ def get_universe_provider(cfg: ScannerConfig) -> UniverseProvider:
 
     if scope == "NIFTY_200":
         return NSENifty200UniverseProvider(
-            min_count=cfg.universe.nifty200_min_count, max_count=cfg.universe.nifty200_max_count,
+            min_count=cfg.universe.nifty200_min_count,
+            max_count=cfg.universe.nifty200_max_count,
             override_csv_path=cfg.universe.constituent_override_csv_path,
         )
 

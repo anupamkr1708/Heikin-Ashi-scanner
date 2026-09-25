@@ -24,7 +24,17 @@ class UniverseSnapshot:
     symbol_count: int
     duplicate_count: int
     invalid_count: int
-    validation_status: str   # "VALID" | "INVALID"
+    validation_status: str  # "VALID" | "INVALID"
+    # P1 provider-hardening additions (data/nse_reports.py's security-master pipeline) — optional,
+    # default None so the existing NIFTY_200 caller (build_snapshot below) is unaffected.
+    source_url: str | None = None
+    file_hash: str | None = None
+    schema_version: str | None = None
+    raw_row_count: int | None = None  # rows in the raw file before any eligibility filtering
+    eligible_count: int | None = None  # rows after eligibility filtering (== constituent_count
+    # for this pipeline; kept as its own named field since the
+    # distinction from raw_row_count is the point of recording it)
+    definition: str | None = None  # human-readable universe-membership rule, e.g. "Series in {EQ,BE}"
 
     def to_dict(self) -> dict:
         return {
@@ -38,11 +48,23 @@ class UniverseSnapshot:
             "duplicate_count": self.duplicate_count,
             "invalid_count": self.invalid_count,
             "validation_status": self.validation_status,
+            "source_url": self.source_url,
+            "file_hash": self.file_hash,
+            "schema_version": self.schema_version,
+            "raw_row_count": self.raw_row_count,
+            "eligible_count": self.eligible_count,
+            "definition": self.definition,
         }
 
 
-def build_snapshot(universe_id: str, constituents_raw: pd.DataFrame, constituents_clean: pd.DataFrame,
-                    source: str, source_version: str | None, retrieved_at: datetime) -> UniverseSnapshot:
+def build_snapshot(
+    universe_id: str,
+    constituents_raw: pd.DataFrame,
+    constituents_clean: pd.DataFrame,
+    source: str,
+    source_version: str | None,
+    retrieved_at: datetime,
+) -> UniverseSnapshot:
     raw_count = len(constituents_raw)
     clean_count = len(constituents_clean)
     dupes = int(constituents_raw["Symbol"].duplicated().sum()) if "Symbol" in constituents_raw.columns else 0

@@ -24,7 +24,7 @@ logger = get_logger(__name__)
 
 @dataclass
 class NSEMainboardEquityUniverseProvider(UniverseProvider):
-    min_count: int = 500     # sanity bounds — NSE mainboard equity count is in the low thousands
+    min_count: int = 500  # sanity bounds — NSE mainboard equity count is in the low thousands
     max_count: int = 4000
 
     def get_constituents(self) -> tuple[pd.DataFrame, str, str]:
@@ -49,12 +49,14 @@ class NSEMainboardEquityUniverseProvider(UniverseProvider):
                 f"changed (see data/nse_reports.py::SECURITY_FILE_COLUMN_CANDIDATES)."
             )
 
-        out = pd.DataFrame({
-            "Symbol": mainboard["NSE_Symbol"],
-            "Company_Name": mainboard["Company_Name"],
-            "Sector": pd.NA,   # the NSE security master does not carry sector classification
-            "ISIN": mainboard["ISIN"] if "ISIN" in mainboard.columns else pd.NA,
-            "Series": mainboard["Series"],
-        })
+        out = pd.DataFrame(
+            {
+                "Symbol": mainboard["NSE_Symbol"],
+                "Company_Name": mainboard["Company_Name"],
+                "Sector": pd.NA,  # the NSE security master does not carry sector classification
+                "ISIN": mainboard["ISIN"] if "ISIN" in mainboard.columns else pd.NA,
+                "Series": mainboard["Series"],
+            }
+        )
         logger.info("NSE_MAINBOARD_EQ universe OK: %d constituents from %s", len(out), result.source_url)
         return out, result.source_url, result.retrieved_at.isoformat()

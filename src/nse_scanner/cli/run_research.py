@@ -78,20 +78,31 @@ def main(argv: list[str] | None = None) -> int:
         coverage_end = sym_end if coverage_end is None else max(coverage_end, sym_end)
 
     if not feature_frames:
-        print("No local history available for any universe symbol — run bootstrap_history.py / "
-              "ingest_eod.py / run_daily.py for several sessions first.", file=sys.stderr)
+        print(
+            "No local history available for any universe symbol — run bootstrap_history.py / "
+            "ingest_eod.py / run_daily.py for several sessions first.",
+            file=sys.stderr,
+        )
         return 1
 
     print(f"DATA COVERAGE (actual, across universe): {coverage_start} .. {coverage_end}")
     if range_start and coverage_start and range_start < coverage_start:
-        print(f"  NOTE: requested --start {range_start} is before the earliest available data "
-              f"({coverage_start}) — narrowed to what actually exists, not fabricated.")
+        print(
+            f"  NOTE: requested --start {range_start} is before the earliest available data "
+            f"({coverage_start}) — narrowed to what actually exists, not fabricated."
+        )
     if range_end and coverage_end and range_end > coverage_end:
-        print(f"  NOTE: requested --end {range_end} is after the latest available data "
-              f"({coverage_end}) — narrowed to what actually exists, not fabricated.")
+        print(
+            f"  NOTE: requested --end {range_end} is after the latest available data "
+            f"({coverage_end}) — narrowed to what actually exists, not fabricated."
+        )
 
-    events = extract_events(feature_frames, cfg.baseline.max_bb_overshoot_pct, cfg.baseline.min_ha_body_pct,
-                             cfg.research.independent_event_cooldown_days)
+    events = extract_events(
+        feature_frames,
+        cfg.baseline.max_bb_overshoot_pct,
+        cfg.baseline.min_ha_body_pct,
+        cfg.research.independent_event_cooldown_days,
+    )
 
     all_signal_days = events.all_signal_days
     independent_events = events.independent_events
@@ -105,8 +116,10 @@ def main(argv: list[str] | None = None) -> int:
         independent_events = independent_events[mask]
 
     print(f"ALL_SIGNAL_DAYS:    {len(all_signal_days)}")
-    print(f"INDEPENDENT_EVENTS: {len(independent_events)}"
-          + (" (filtered to --start/--end range)" if (range_start or range_end) else ""))
+    print(
+        f"INDEPENDENT_EVENTS: {len(independent_events)}"
+        + (" (filtered to --start/--end range)" if (range_start or range_end) else "")
+    )
 
     rows = []
     for ev in independent_events.itertuples(index=False):
@@ -120,12 +133,20 @@ def main(argv: list[str] | None = None) -> int:
             continue
         fwd = forward_returns_multi_horizon(price_df, entry.entry_pos, cfg.research.forward_return_horizons)
         exc = calculate_mfe_mae(price_df, entry.entry_pos, entry.entry_price, horizon, cfg.research.entry_price_method)
-        rows.append({
-            "Symbol": symbol, "Sector": sector_by_symbol.get(symbol), "Signal_Date": ev.Signal_Date,
-            "Entry_Date": entry.entry_date, "Entry_Price": entry.entry_price,
-            "Gap_Pct": entry.gap_from_signal_to_entry_pct,
-            "Breakout_Type": ev.Breakout_Type, **fwd, "MFE_Pct": exc.mfe_pct, "MAE_Pct": exc.mae_pct,
-        })
+        rows.append(
+            {
+                "Symbol": symbol,
+                "Sector": sector_by_symbol.get(symbol),
+                "Signal_Date": ev.Signal_Date,
+                "Entry_Date": entry.entry_date,
+                "Entry_Price": entry.entry_price,
+                "Gap_Pct": entry.gap_from_signal_to_entry_pct,
+                "Breakout_Type": ev.Breakout_Type,
+                **fwd,
+                "MFE_Pct": exc.mfe_pct,
+                "MAE_Pct": exc.mae_pct,
+            }
+        )
 
     if not rows:
         print("No independent events had a resolvable entry (need at least one bar after the signal).")
@@ -133,8 +154,11 @@ def main(argv: list[str] | None = None) -> int:
 
     results_df = pd.DataFrame(rows)
     primary_col = f"FwdRet_{horizon}D"
-    stats = describe_returns(results_df[primary_col].to_numpy(), results_df["Symbol"].to_numpy(),
-                              pd.to_datetime(results_df["Signal_Date"]).to_numpy())
+    stats = describe_returns(
+        results_df[primary_col].to_numpy(),
+        results_df["Symbol"].to_numpy(),
+        pd.to_datetime(results_df["Signal_Date"]).to_numpy(),
+    )
     excursion_summary = summarize_excursions(results_df["MFE_Pct"].tolist(), results_df["MAE_Pct"].tolist())
     cluster = cluster_summary(results_df["Symbol"].to_numpy(), pd.to_datetime(results_df["Signal_Date"]).to_numpy())
     sectors_table = sector_summary(results_df["Sector"].to_numpy(), results_df[primary_col].to_numpy())

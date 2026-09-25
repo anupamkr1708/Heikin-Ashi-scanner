@@ -33,8 +33,14 @@ class MandatoryResult:
     mandatory_pass: bool
 
 
-def evaluate_mandatory(close: float, bb_upper: float, bb_overshoot_pct: float, ha_body_pct: float,
-                        max_bb_overshoot_pct: float = 4.0, min_ha_body_pct: float = 1.0) -> MandatoryResult:
+def evaluate_mandatory(
+    close: float,
+    bb_upper: float,
+    bb_overshoot_pct: float,
+    ha_body_pct: float,
+    max_bb_overshoot_pct: float = 4.0,
+    min_ha_body_pct: float = 1.0,
+) -> MandatoryResult:
     """Evaluate the three mandatory conditions for a single (already-computed) row.
 
     Takes scalar, already-computed feature values rather than a raw OHLC row so that this
@@ -52,9 +58,14 @@ def evaluate_mandatory(close: float, bb_upper: float, bb_overshoot_pct: float, h
     )
 
 
-def evaluate_mandatory_vectorized(close: pd.Series, bb_upper: pd.Series, bb_overshoot_pct: pd.Series,
-                                   ha_body_pct: pd.Series, max_bb_overshoot_pct: float = 4.0,
-                                   min_ha_body_pct: float = 1.0) -> pd.DataFrame:
+def evaluate_mandatory_vectorized(
+    close: pd.Series,
+    bb_upper: pd.Series,
+    bb_overshoot_pct: pd.Series,
+    ha_body_pct: pd.Series,
+    max_bb_overshoot_pct: float = 4.0,
+    min_ha_body_pct: float = 1.0,
+) -> pd.DataFrame:
     """Vectorized form used by the historical event extractor (research/events.py) — must stay
     mathematically identical to `evaluate_mandatory` (tests/unit/test_signal.py asserts this by
     comparing the two on the same synthetic data)."""

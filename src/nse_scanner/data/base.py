@@ -22,16 +22,18 @@ class DataProvider(ABC):
     name: str
 
     @abstractmethod
-    def fetch_history(self, symbol: str, period: str, interval: str
-                       ) -> tuple[pd.DataFrame | None, NormalizedBarMeta | None, str | None]:
+    def fetch_history(
+        self, symbol: str, period: str, interval: str
+    ) -> tuple[pd.DataFrame | None, NormalizedBarMeta | None, str | None]:
         """Returns (dataframe_or_None, meta_or_None, error_message_or_None). Never raises for an
         ordinary per-symbol failure (missing ticker, empty response) — that is reported via the
         error_message so one bad symbol never halts a batch (PART 15). Raises DataProviderError
         only for a systemic failure (e.g. the whole batch endpoint is unreachable)."""
 
     @abstractmethod
-    def fetch_history_batch(self, symbols: list[str], period: str, interval: str
-                             ) -> tuple[dict[str, pd.DataFrame], dict[str, str]]:
+    def fetch_history_batch(
+        self, symbols: list[str], period: str, interval: str
+    ) -> tuple[dict[str, pd.DataFrame], dict[str, str]]:
         """Returns (results: symbol->DataFrame for successes, errors: symbol->error message)."""
 
 
@@ -52,8 +54,7 @@ class BenchmarkProvider(ABC):
     per-stock scan failing too (BUG 3 / BUG 16)."""
 
     @abstractmethod
-    def fetch_benchmark(self, ticker: str, period: str, interval: str
-                         ) -> tuple[pd.DataFrame | None, str | None]:
+    def fetch_benchmark(self, ticker: str, period: str, interval: str) -> tuple[pd.DataFrame | None, str | None]:
         """Returns (dataframe_or_None, error_message_or_None)."""
 
 

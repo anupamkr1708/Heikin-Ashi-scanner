@@ -1,33 +1,61 @@
 # NSE trading-holiday calendar.
 #
-# PROVENANCE OF THE 2026 ENTRY BELOW: this repository's own build/test sandbox has no network
-# path to nseindia.com, so the standard fixed-date national holidays (Republic Day, Independence
-# Day, Gandhi Jayanti, Christmas) are included as a documented convenience default — NSE has
-# historically observed these every year, but a fixed date can still shift if it falls on a
-# weekend or is locally adjusted, so verify before relying on it. The 2026-09-14 entry is
-# EXPLICITLY USER-SUPPLIED: the maintainer, who has run this system against real live NSE data,
-# stated it directly as a fact ("2026-09-14 Monday is an NSE holiday") rather than this being a
-# guess made by the assistant that built this repository — see PART 6/PART 15's prohibition on
-# fabricated calendar data, which this respects by recording provenance rather than inventing a
-# date. NSE's lunar-calendar festival holidays (Diwali, Holi, Eid, Ganesh Chaturthi, etc.) for
-# 2026 are NOT included below and remain unverified — this file is a PARTIAL list, not a complete
-# transcription of the official circular.
+# 2026 ENTRY — sourced from the official NSE circular, not fabricated or recalled from training
+# data (PART 6/PART 15 — no invented calendar data). Verified by live web lookup during the v1.3
+# research-integrity audit (this repository's original build sandbox had no network path to
+# nseindia.com, so the prior version of this file was a partial, disclosed-as-partial, best-effort
+# list — see CHANGELOG.md for that history).
 #
-# BEFORE relying on this for a production ingestion/scan across the full year:
-#   1. Fetch the complete official list from:
-#      https://www.nseindia.com/resources/exchange-communication-holidays
-#   2. Replace/extend the 2026 entry below with the complete, verified list.
+# PRIMARY SOURCE (15 dates, items 1-15 below):
+#   NSE circular, Download Ref No. NSE/CMTR/71775, Circular Ref. No. 172/2025, dated
+#   December 12, 2025, "Trading holidays for the calendar year 2026" (Capital Market Segment).
+#   https://nsearchives.nseindia.com/content/circulars/CMTR71775.pdf
+#   Fetched and cross-checked directly (PDF text extracted) on 2026-09-22.
+#
+# AD-HOC ADDITION (item 16 below) — NOT in the primary annual circular, added later in the year:
+#   Thursday, 2026-01-15 was separately declared a Capital Market Segment trading holiday
+#   (Municipal Corporation Elections in Maharashtra / BMC civic polls), via a circular issued
+#   2026-01-12 in partial modification of NSE/CMTR/71775. This repository could not fetch that
+#   specific modification PDF directly, but the date, day-of-week, reason, and "partial
+#   modification to NSE/CMTR/71775" framing are corroborated by multiple independent contemporary
+#   news reports (Business Standard, Upstox, Angel One, PL Capital, and others, all dated
+#   2026-01-12/13/14) quoting the circular text consistently. Cross-checked on 2026-09-22.
+#
+# THIS IS EXACTLY THE FAILURE MODE calendar.py's module docstring warns about: an annual circular,
+# however official, is not guaranteed complete for the whole year — ad-hoc closures (elections,
+# unscheduled events) get added via later modification circulars. A "15 holidays as of December"
+# list would have silently mis-resolved 2026-01-15 as a trading day. Re-verify against
+# https://www.nseindia.com/resources/exchange-communication-holidays before relying on this file
+# for any date after the "cross-checked on" date above, especially late in the year (a similar
+# ad-hoc addition remains possible for any date not yet reached).
 #
 # data/calendar.py::resolve_holidays_for_run() blocks (in strict/production mode) rather than
-# silently treating an unlisted year as holiday-free, so a missing YEAR fails loudly — but a
-# missing individual DATE within a covered year does not (this file's completeness within a
-# covered year is not separately verified by code, only by you).
+# silently treating an unlisted YEAR as holiday-free, so a missing year fails loudly — but a
+# missing individual DATE within a covered year (like the pre-2026-09-22 version of this file
+# missing 2026-01-15, or any future ad-hoc addition this file hasn't been re-verified against) does
+# NOT — this file's completeness within a covered year is not separately verified by code, only by
+# re-checking the source above periodically.
 holidays:
   2026:
-    - "2026-01-26"   # Republic Day (fixed-date convenience default — verify)
-    - "2026-08-15"   # Independence Day (fixed-date convenience default — verify)
-    - "2026-09-14"   # USER-SUPPLIED: stated directly by the maintainer as an NSE holiday
-    - "2026-10-02"   # Gandhi Jayanti (fixed-date convenience default — verify)
-    - "2026-12-25"   # Christmas (fixed-date convenience default — verify)
-    # Diwali/Laxmi Pujan, Holi, Eid, Ganesh Chaturthi, and other lunar-calendar festival
-    # holidays for 2026 are NOT yet included — add them from the official circular.
+    - "2026-01-15"   # Municipal Corporation Elections (Maharashtra/BMC) — ad-hoc addition, see above
+    - "2026-01-26"   # Republic Day
+    - "2026-03-03"   # Holi
+    - "2026-03-26"   # Shri Ram Navami
+    - "2026-03-31"   # Shri Mahavir Jayanti
+    - "2026-04-03"   # Good Friday
+    - "2026-04-14"   # Dr. Baba Saheb Ambedkar Jayanti
+    - "2026-05-01"   # Maharashtra Day
+    - "2026-05-28"   # Bakri Id
+    - "2026-06-26"   # Muharram
+    - "2026-09-14"   # Ganesh Chaturthi
+    - "2026-10-02"   # Mahatma Gandhi Jayanti
+    - "2026-10-20"   # Dussehra
+    - "2026-11-10"   # Diwali-Balipratipada
+    - "2026-11-24"   # Prakash Gurpurb Sri Guru Nanak Dev
+    - "2026-12-25"   # Christmas
+    # NOT separately listed here (correctly): 2026-08-15 (Independence Day) falls on a Saturday
+    # in 2026, and 2026-11-08 (Diwali Laxmi Pujan, Muhurat trading day) falls on a Sunday — both
+    # are already non-trading days via the weekday check in data/calendar.py::is_trading_day, so
+    # omitting them from this holiday SET changes no computation. The official circular lists them
+    # separately as "holidays falling on Saturday/Sunday" for awareness, not as additional weekday
+    # closures.

@@ -5,11 +5,13 @@ from nse_scanner.indicators.atr import true_range, wilder_atr
 
 
 def test_true_range_hand_calculated():
-    df = pd.DataFrame({
-        "High": [110, 115, 108],
-        "Low": [100, 105, 95],
-        "Close": [105, 112, 100],
-    })
+    df = pd.DataFrame(
+        {
+            "High": [110, 115, 108],
+            "Low": [100, 105, 95],
+            "Close": [105, 112, 100],
+        }
+    )
     tr = true_range(df)
     # Bar 0 has no previous close, so true_range() falls back to plain High-Low for that single
     # bar (the standard convention) rather than NaN.
@@ -23,9 +25,9 @@ def test_true_range_hand_calculated():
 def test_wilder_atr_matches_hand_computed_recursion():
     # 6 bars of hand-picked True Range values (bypassing OHLC by constructing High/Low/Close
     # such that TR is exactly [nan, 2, 4, 3, 5, 1] for period=3).
-    highs =  [100, 102, 106, 108, 112, 111]
-    lows =   [ 98, 100, 102, 105, 107, 110]
-    closes = [ 99, 100, 104, 106, 110, 110.5]
+    highs = [100, 102, 106, 108, 112, 111]
+    lows = [98, 100, 102, 105, 107, 110]
+    closes = [99, 100, 104, 106, 110, 110.5]
     df = pd.DataFrame({"High": highs, "Low": lows, "Close": closes})
 
     tr = true_range(df).to_numpy()
@@ -33,7 +35,7 @@ def test_wilder_atr_matches_hand_computed_recursion():
     atr = wilder_atr(df, period=period)
 
     # Seed = mean of TR[1:period+1] (skipping the NaN first TR)
-    seed = np.nanmean(tr[1:period + 1])
+    seed = np.nanmean(tr[1 : period + 1])
     assert atr.iloc[period] == pytest.approx(seed)
 
     # Next value follows the Wilder recursion, not a simple rolling mean of the last `period` TRs

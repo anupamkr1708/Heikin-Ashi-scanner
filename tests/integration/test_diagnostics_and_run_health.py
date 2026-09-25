@@ -1,10 +1,9 @@
 """Covers the exact bugs the user's real NSE run surfaced:
 
-  - Diagnostics previously only contained PASS rows.
-  - Mapping_OK = universe_count - len(scan_log) could go negative / was meaningless.
-  - Benchmark failure alone pushed RUN_HEALTH to RED even though the baseline scan was healthy.
+- Diagnostics previously only contained PASS rows.
+- Mapping_OK = universe_count - len(scan_log) could go negative / was meaningless.
+- Benchmark failure alone pushed RUN_HEALTH to RED even though the baseline scan was healthy.
 """
-
 
 import pandas as pd
 from nse_scanner.config import ScannerConfig
@@ -34,8 +33,14 @@ def test_diagnostics_contains_every_universe_member_regardless_of_outcome():
     }
     session = _session_for(histories)
 
-    result = run_scan(cfg, InMemoryUniverseProvider(universe_df), InMemoryDataProvider(histories),
-                       InMemoryBenchmarkProvider(generate_synthetic_index()), session, holidays=set())
+    result = run_scan(
+        cfg,
+        InMemoryUniverseProvider(universe_df),
+        InMemoryDataProvider(histories),
+        InMemoryBenchmarkProvider(generate_synthetic_index()),
+        session,
+        holidays=set(),
+    )
 
     diagnostics = result.sheets.diagnostics
     assert len(diagnostics) == len(SYNTHETIC_SYMBOLS)  # every symbol, not just the one PASS
@@ -53,8 +58,14 @@ def test_diagnostics_includes_insufficient_history_symbols_with_reason():
     histories[SYNTHETIC_SYMBOLS[0]] = generate_synthetic_ohlcv(SYNTHETIC_SYMBOLS[0], n_days=1)
     session = _session_for(histories)
 
-    result = run_scan(cfg, InMemoryUniverseProvider(universe_df), InMemoryDataProvider(histories),
-                       InMemoryBenchmarkProvider(generate_synthetic_index()), session, holidays=set())
+    result = run_scan(
+        cfg,
+        InMemoryUniverseProvider(universe_df),
+        InMemoryDataProvider(histories),
+        InMemoryBenchmarkProvider(generate_synthetic_index()),
+        session,
+        holidays=set(),
+    )
 
     diagnostics = result.sheets.diagnostics
     assert len(diagnostics) == len(SYNTHETIC_SYMBOLS)
@@ -74,8 +85,14 @@ def test_benchmark_failure_alone_does_not_force_red():
     session = _session_for(histories)
 
     # No benchmark provider at all -> benchmark_status stays UNAVAILABLE, baseline scan is fine.
-    result = run_scan(cfg, InMemoryUniverseProvider(universe_df), InMemoryDataProvider(histories),
-                       benchmark_provider=None, session=session, holidays=set())
+    result = run_scan(
+        cfg,
+        InMemoryUniverseProvider(universe_df),
+        InMemoryDataProvider(histories),
+        benchmark_provider=None,
+        session=session,
+        holidays=set(),
+    )
 
     assert result.benchmark_status == "UNAVAILABLE"
     assert result.data_validation_failures == 0
@@ -90,8 +107,14 @@ def test_high_baseline_failure_rate_is_red_regardless_of_benchmark():
     histories = {sym: generate_synthetic_ohlcv(sym, n_days=1) for sym in SYNTHETIC_SYMBOLS}
     session = _session_for(histories)
 
-    result = run_scan(cfg, InMemoryUniverseProvider(universe_df), InMemoryDataProvider(histories),
-                       InMemoryBenchmarkProvider(generate_synthetic_index()), session, holidays=set())
+    result = run_scan(
+        cfg,
+        InMemoryUniverseProvider(universe_df),
+        InMemoryDataProvider(histories),
+        InMemoryBenchmarkProvider(generate_synthetic_index()),
+        session,
+        holidays=set(),
+    )
 
     assert result.run_health == "RED"
     assert result.needs_bootstrap is True
@@ -103,8 +126,14 @@ def test_healthy_baseline_and_healthy_benchmark_is_green():
     histories = {sym: generate_synthetic_ohlcv(sym, n_days=80) for sym in SYNTHETIC_SYMBOLS}
     session = _session_for(histories)
 
-    result = run_scan(cfg, InMemoryUniverseProvider(universe_df), InMemoryDataProvider(histories),
-                       InMemoryBenchmarkProvider(generate_synthetic_index()), session, holidays=set())
+    result = run_scan(
+        cfg,
+        InMemoryUniverseProvider(universe_df),
+        InMemoryDataProvider(histories),
+        InMemoryBenchmarkProvider(generate_synthetic_index()),
+        session,
+        holidays=set(),
+    )
 
     assert result.run_health == "GREEN"
     assert result.needs_bootstrap is False
@@ -125,8 +154,14 @@ def test_security_scan_failure_is_bucketed_separately_from_data_validation_failu
 
     monkeypatch.setattr(scan_module, "check_bollinger_ordering", _boom)
 
-    result = run_scan(cfg, InMemoryUniverseProvider(universe_df), InMemoryDataProvider(histories),
-                       InMemoryBenchmarkProvider(generate_synthetic_index()), session, holidays=set())
+    result = run_scan(
+        cfg,
+        InMemoryUniverseProvider(universe_df),
+        InMemoryDataProvider(histories),
+        InMemoryBenchmarkProvider(generate_synthetic_index()),
+        session,
+        holidays=set(),
+    )
 
     assert result.security_scan_failures == len(SYNTHETIC_SYMBOLS)
     assert result.data_validation_failures == 0

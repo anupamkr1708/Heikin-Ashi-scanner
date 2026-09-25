@@ -18,8 +18,10 @@ def _make_extended_breakout_series(n=60):
     highs = np.maximum(opens, closes) + rng.uniform(0.1, 0.5, n)
     lows = np.minimum(opens, closes) - rng.uniform(0.1, 0.5, n)
     volumes = rng.integers(10_000, 100_000, n)
-    return pd.DataFrame({"Open": opens, "High": highs, "Low": lows, "Close": closes, "Volume": volumes},
-                         index=pd.bdate_range("2025-01-01", periods=n))
+    return pd.DataFrame(
+        {"Open": opens, "High": highs, "Low": lows, "Close": closes, "Volume": volumes},
+        index=pd.bdate_range("2025-01-01", periods=n),
+    )
 
 
 def test_all_signal_days_can_include_consecutive_continuation_rows():
@@ -38,8 +40,9 @@ def test_independent_events_never_exceeds_all_signal_days():
     df = _make_extended_breakout_series()
     feat = build_feature_frame(df, cfg)
     feat["Symbol"] = "TESTSYM"
-    events = extract_events({"TESTSYM": feat}, cfg.baseline.max_bb_overshoot_pct,
-                             cfg.baseline.min_ha_body_pct, cooldown_days=5)
+    events = extract_events(
+        {"TESTSYM": feat}, cfg.baseline.max_bb_overshoot_pct, cfg.baseline.min_ha_body_pct, cooldown_days=5
+    )
     assert len(events.independent_events) <= len(events.all_signal_days)
 
 
@@ -47,9 +50,12 @@ def test_cooldown_collapses_a_dense_synthetic_streak():
     # Build a minimal synthetic signal_days frame directly (bypassing indicator computation) to
     # test extract_independent_events' cooldown logic in isolation and deterministically.
     dates = pd.bdate_range("2025-01-01", periods=6)
-    signal_days = pd.DataFrame({
-        "Breakout_Type": [FRESH_BREAKOUT] + ["CONTINUATION"] * 5,
-    }, index=dates)
+    signal_days = pd.DataFrame(
+        {
+            "Breakout_Type": [FRESH_BREAKOUT] + ["CONTINUATION"] * 5,
+        },
+        index=dates,
+    )
 
     # cooldown_days=10 guarantees the cooldown has NOT elapsed anywhere within this 6-row window
     # (a cooldown_days=5 would legitimately re-arm exactly at row index 5 — see the boundary
@@ -63,9 +69,12 @@ def test_cooldown_collapses_a_dense_synthetic_streak():
 
 def test_cooldown_re_arms_exactly_at_the_configured_boundary():
     dates = pd.bdate_range("2025-01-01", periods=6)
-    signal_days = pd.DataFrame({
-        "Breakout_Type": [FRESH_BREAKOUT] + ["CONTINUATION"] * 5,
-    }, index=dates)
+    signal_days = pd.DataFrame(
+        {
+            "Breakout_Type": [FRESH_BREAKOUT] + ["CONTINUATION"] * 5,
+        },
+        index=dates,
+    )
     independent = extract_independent_events(signal_days, cooldown_days=5)
     # Row index 5 is exactly 5 rows after the selected row at index 0, so the cooldown has
     # elapsed (inclusive boundary) and it re-arms as a second independent event.
@@ -74,9 +83,12 @@ def test_cooldown_re_arms_exactly_at_the_configured_boundary():
 
 def test_new_fresh_breakout_after_a_failed_one_always_counts():
     dates = pd.bdate_range("2025-01-01", periods=3)
-    signal_days = pd.DataFrame({
-        "Breakout_Type": [FRESH_BREAKOUT, FRESH_BREAKOUT, FRESH_BREAKOUT],
-    }, index=dates)
+    signal_days = pd.DataFrame(
+        {
+            "Breakout_Type": [FRESH_BREAKOUT, FRESH_BREAKOUT, FRESH_BREAKOUT],
+        },
+        index=dates,
+    )
     independent = extract_independent_events(signal_days, cooldown_days=100)
     # Every row is its own FRESH_BREAKOUT transition, so every one counts regardless of cooldown.
     assert len(independent) == 3

@@ -15,11 +15,11 @@ def test_breakout_states_hand_traced():
 
     bo = calculate_breakout_state(close, upper)
 
-    assert bo["Breakout_Type"].iloc[0] == NO_BREAKOUT     # 95 <= 100
-    assert bo["Breakout_Type"].iloc[1] == FRESH_BREAKOUT   # prev<=upper, now>upper
-    assert bo["Breakout_Type"].iloc[2] == CONTINUATION     # prev>upper, now>upper
+    assert bo["Breakout_Type"].iloc[0] == NO_BREAKOUT  # 95 <= 100
+    assert bo["Breakout_Type"].iloc[1] == FRESH_BREAKOUT  # prev<=upper, now>upper
+    assert bo["Breakout_Type"].iloc[2] == CONTINUATION  # prev>upper, now>upper
     assert bo["Breakout_Type"].iloc[3] == FAILED_BREAKOUT  # prev>upper, now<=upper
-    assert bo["Breakout_Type"].iloc[4] == FRESH_BREAKOUT   # prev<=upper, now>upper again
+    assert bo["Breakout_Type"].iloc[4] == FRESH_BREAKOUT  # prev<=upper, now>upper again
     assert bo["Breakout_Type"].iloc[5] == FAILED_BREAKOUT  # prev>upper, now<=upper
 
 

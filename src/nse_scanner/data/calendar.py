@@ -17,9 +17,13 @@ CODE_REVIEW.md. If a year is missing from the holiday file, this module does NOT
 "no holidays that year" for session-count purposes where that would matter for correctness;
 callers get an explicit ``CalendarError`` instead (see `assert_year_covered`).
 
-Fixed-date national holidays that NSE has historically also observed (Republic Day, Independence
-Day, Gandhi Jayanti) are included as a documented convenience default, clearly separated from the
-festival list, but production use should still prefer the official circular for the exact year.
+**2026 note (found during the v1.3 research-integrity audit):** the official annual circular is
+not the whole story even for a year it fully covers — NSE issued an ad-hoc modification circular
+on 2026-01-12 adding 2026-01-15 as a trading holiday (Maharashtra municipal elections), on top of
+the 15 dates in the original December 2025 annual circular. `config/nse_holidays.yaml` documents
+both the primary circular and this ad-hoc addition with separate provenance for each. This is
+exactly why this module treats "year covered" and "year complete" as different claims: covering a
+year does not guarantee every ad-hoc addition issued during that year has been re-verified.
 """
 
 from __future__ import annotations
@@ -34,11 +38,6 @@ import yaml
 from nse_scanner.exceptions import CalendarError
 
 NSE_CLOSE_TIME = dtime(15, 30)
-
-# Fixed-date holidays NSE has historically observed every year (documented convenience default —
-# NOT a substitute for the official circular, which can vary e.g. if a fixed date falls on a
-# weekend or is locally shifted).
-_FIXED_DATE_HOLIDAYS_MMDD = {(1, 26), (8, 15), (10, 2)}
 
 
 @dataclass(frozen=True)
@@ -143,8 +142,8 @@ def resolve_holidays_for_run(holiday_yaml_path: str | Path, as_of: date, strict:
         if strict:
             raise CalendarError(msg)
         import logging
-        logging.getLogger(__name__).warning("%s (proceeding with weekday-only calendar for %s)",
-                                              msg, sorted(missing))
+
+        logging.getLogger(__name__).warning("%s (proceeding with weekday-only calendar for %s)", msg, sorted(missing))
     return load_holiday_set(holiday_yaml_path, needed_years)
 
 
@@ -214,8 +213,7 @@ def resolve_session(now: datetime, holidays: set[date]) -> SessionInfo:
     )
 
 
-def classify_data_status(last_bar_date: date | None, expected_completed_session: date,
-                          holidays: set[date]) -> str:
+def classify_data_status(last_bar_date: date | None, expected_completed_session: date, holidays: set[date]) -> str:
     """Session-based staleness classification (replaces BUG 1's calendar-day heuristic)."""
     if last_bar_date is None:
         return DataStatus.MISSING
@@ -232,8 +230,4 @@ def classify_data_status(last_bar_date: date | None, expected_completed_session:
 def trim_incomplete_candle(last_bar_date: date, now: datetime, holidays: set[date]) -> bool:
     """True if the last bar belongs to *today's* still-open session and should be dropped before
     computing signals (regular-session close not yet reached)."""
-    return (
-        last_bar_date == now.date()
-        and is_trading_day(now.date(), holidays)
-        and now.time() < NSE_CLOSE_TIME
-    )
+    return last_bar_date == now.date() and is_trading_day(now.date(), holidays) and now.time() < NSE_CLOSE_TIME

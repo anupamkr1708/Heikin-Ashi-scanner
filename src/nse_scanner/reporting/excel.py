@@ -26,8 +26,8 @@ import pandas as pd
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-PCT_POINT_FORMAT = '0.00"%"'      # for *_Pct fields already scaled to percentage points
-RATIO_FORMAT = "0.0000"           # for BB_PctB and similar true ratios
+PCT_POINT_FORMAT = '0.00"%"'  # for *_Pct fields already scaled to percentage points
+RATIO_FORMAT = "0.0000"  # for BB_PctB and similar true ratios
 PRICE_FORMAT = "0.00"
 INT_FORMAT = "0"
 
@@ -42,8 +42,19 @@ def _infer_number_format(column_name: str) -> str | None:
         return RATIO_FORMAT
     if column_name.endswith("_Pct"):
         return PCT_POINT_FORMAT
-    if column_name in ("CMP", "Close", "Open", "High", "Low", "Entry_Price", "Signal_Close",
-                        "BB_Upper", "BB_Middle", "BB_Lower", "ATR14"):
+    if column_name in (
+        "CMP",
+        "Close",
+        "Open",
+        "High",
+        "Low",
+        "Entry_Price",
+        "Signal_Close",
+        "BB_Upper",
+        "BB_Middle",
+        "BB_Lower",
+        "ATR14",
+    ):
         return PRICE_FORMAT
     if column_name in ("Volume", "Rank", "Days_Above_Upper_BB", "N"):
         return INT_FORMAT
