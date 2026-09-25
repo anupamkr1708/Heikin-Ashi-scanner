@@ -19,8 +19,7 @@ import pandas as pd
 REQUIRED_COLUMNS = ("Close",)
 
 
-def calculate_bollinger_bands(df: pd.DataFrame, period: int = 20, std_mult: float = 2.0,
-                               ddof: int = 1) -> pd.DataFrame:
+def calculate_bollinger_bands(df: pd.DataFrame, period: int = 20, std_mult: float = 2.0, ddof: int = 1) -> pd.DataFrame:
     """Returns a DataFrame indexed like `df` with columns:
     BB_Middle, BB_StdDev, BB_Upper, BB_Lower, BB_Width_Pct, BB_PctB.
 

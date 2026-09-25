@@ -142,8 +142,8 @@ def resolve_holidays_for_run(holiday_yaml_path: str | Path, as_of: date, strict:
         if strict:
             raise CalendarError(msg)
         import logging
-        logging.getLogger(__name__).warning("%s (proceeding with weekday-only calendar for %s)",
-                                              msg, sorted(missing))
+
+        logging.getLogger(__name__).warning("%s (proceeding with weekday-only calendar for %s)", msg, sorted(missing))
     return load_holiday_set(holiday_yaml_path, needed_years)
 
 
@@ -213,8 +213,7 @@ def resolve_session(now: datetime, holidays: set[date]) -> SessionInfo:
     )
 
 
-def classify_data_status(last_bar_date: date | None, expected_completed_session: date,
-                          holidays: set[date]) -> str:
+def classify_data_status(last_bar_date: date | None, expected_completed_session: date, holidays: set[date]) -> str:
     """Session-based staleness classification (replaces BUG 1's calendar-day heuristic)."""
     if last_bar_date is None:
         return DataStatus.MISSING
@@ -231,8 +230,4 @@ def classify_data_status(last_bar_date: date | None, expected_completed_session:
 def trim_incomplete_candle(last_bar_date: date, now: datetime, holidays: set[date]) -> bool:
     """True if the last bar belongs to *today's* still-open session and should be dropped before
     computing signals (regular-session close not yet reached)."""
-    return (
-        last_bar_date == now.date()
-        and is_trading_day(now.date(), holidays)
-        and now.time() < NSE_CLOSE_TIME
-    )
+    return last_bar_date == now.date() and is_trading_day(now.date(), holidays) and now.time() < NSE_CLOSE_TIME

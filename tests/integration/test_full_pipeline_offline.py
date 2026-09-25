@@ -38,8 +38,10 @@ def test_full_offline_scan_pipeline_produces_a_signal_and_a_valid_report(tmp_pat
 
     last_date = max(df.index[-1] for df in histories.values())
     session = SessionInfo(
-        as_of_date=last_date.date(), expected_completed_session=last_date.date(),
-        signal_date=last_date.date(), planned_entry_date=last_date.date(),
+        as_of_date=last_date.date(),
+        expected_completed_session=last_date.date(),
+        signal_date=last_date.date(),
+        planned_entry_date=last_date.date(),
     )
 
     result = run_scan(cfg, universe_provider, data_provider, benchmark_provider, session, holidays=set())
@@ -58,6 +60,7 @@ def test_full_offline_scan_pipeline_produces_a_signal_and_a_valid_report(tmp_pat
     assert row["Data_Status"] == "CURRENT"
 
     from nse_scanner.reporting.excel import write_report
+
     out_path = Path(tmp_path) / "report.xlsx"
     written = write_report(result.sheets, out_path)
     assert written.exists()
@@ -68,9 +71,7 @@ def test_scan_survives_a_broken_symbol_without_halting(tmp_path):
     """One bad symbol must never halt the whole scan (PART 15)."""
     cfg = ScannerConfig()
     universe_df = generate_synthetic_universe()
-    histories = {
-        sym: generate_synthetic_ohlcv(sym, n_days=80) for sym in SYNTHETIC_SYMBOLS[1:]
-    }
+    histories = {sym: generate_synthetic_ohlcv(sym, n_days=80) for sym in SYNTHETIC_SYMBOLS[1:]}
     # SYNTHETIC_SYMBOLS[0] has NO history at all -> must be logged as a failure, not crash the run
     index_df = generate_synthetic_index()
 

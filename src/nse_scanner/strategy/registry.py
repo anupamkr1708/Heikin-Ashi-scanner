@@ -66,7 +66,5 @@ REGISTRY: dict[str, StrategyVariant] = {
 
 def get_variant(strategy_id: str) -> StrategyVariant:
     if strategy_id not in REGISTRY:
-        raise KeyError(
-            f"Unknown strategy_id '{strategy_id}'. Registered variants: {sorted(REGISTRY)}"
-        )
+        raise KeyError(f"Unknown strategy_id '{strategy_id}'. Registered variants: {sorted(REGISTRY)}")
     return REGISTRY[strategy_id]

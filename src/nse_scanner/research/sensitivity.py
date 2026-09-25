@@ -30,17 +30,25 @@ class SensitivityCell:
     win_rate: float | None
 
 
-def build_parameter_grid(bb_periods=DEFAULT_BB_PERIOD_GRID, bb_std_mults=DEFAULT_BB_STD_MULT_GRID,
-                          max_overshoots=DEFAULT_MAX_OVERSHOOT_GRID, min_ha_bodies=DEFAULT_MIN_HA_BODY_GRID
-                          ) -> list[dict]:
+def build_parameter_grid(
+    bb_periods=DEFAULT_BB_PERIOD_GRID,
+    bb_std_mults=DEFAULT_BB_STD_MULT_GRID,
+    max_overshoots=DEFAULT_MAX_OVERSHOOT_GRID,
+    min_ha_bodies=DEFAULT_MIN_HA_BODY_GRID,
+) -> list[dict]:
     """Returns the full cartesian grid as a list of parameter dicts, for the caller to run the
     strategy+research pipeline against, one cell at a time. This module never runs the strategy
     itself — that would couple it to the data/indicator layers unnecessarily (PART 65)."""
     grid = []
     for bp, sm, mo, mh in product(bb_periods, bb_std_mults, max_overshoots, min_ha_bodies):
-        grid.append({
-            "bb_period": bp, "bb_std_mult": sm, "max_bb_overshoot_pct": mo, "min_ha_body_pct": mh,
-        })
+        grid.append(
+            {
+                "bb_period": bp,
+                "bb_std_mult": sm,
+                "max_bb_overshoot_pct": mo,
+                "min_ha_body_pct": mh,
+            }
+        )
     return grid
 
 

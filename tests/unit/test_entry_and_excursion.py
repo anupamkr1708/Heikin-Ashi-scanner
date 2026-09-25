@@ -5,12 +5,14 @@ from nse_scanner.research.mfe_mae import calculate_mfe_mae
 
 def _price_df():
     # signal at index 2 (Close=100). Index 3 is T+1.
-    return pd.DataFrame({
-        "Open":  [10, 20, 100, 105, 110, 108, 120],
-        "High":  [11, 21, 101, 115, 118, 112, 125],
-        "Low":   [ 9, 19,  99, 103, 107, 100, 115],
-        "Close": [10, 20, 100, 108, 112, 106, 122],
-    })
+    return pd.DataFrame(
+        {
+            "Open": [10, 20, 100, 105, 110, 108, 120],
+            "High": [11, 21, 101, 115, 118, 112, 125],
+            "Low": [9, 19, 99, 103, 107, 100, 115],
+            "Close": [10, 20, 100, 108, 112, 106, 122],
+        }
+    )
 
 
 def test_next_open_entry_uses_t_plus_1_open_not_signal_close():

@@ -25,8 +25,9 @@ class ExcursionResult:
     time_to_mae: int | None
 
 
-def calculate_mfe_mae(price_df: pd.DataFrame, entry_pos: int, entry_price: float,
-                       horizon_days: int, entry_method: str) -> ExcursionResult:
+def calculate_mfe_mae(
+    price_df: pd.DataFrame, entry_pos: int, entry_price: float, horizon_days: int, entry_method: str
+) -> ExcursionResult:
     """`horizon_days` bounds the excursion window to `horizon_days` sessions after entry."""
     n = len(price_df)
     window_end = min(entry_pos + horizon_days, n - 1)
@@ -37,8 +38,8 @@ def calculate_mfe_mae(price_df: pd.DataFrame, entry_pos: int, entry_price: float
     if window_start > window_end:
         return ExcursionResult(None, None, None, None)
 
-    highs = price_df["High"].iloc[window_start:window_end + 1]
-    lows = price_df["Low"].iloc[window_start:window_end + 1]
+    highs = price_df["High"].iloc[window_start : window_end + 1]
+    lows = price_df["Low"].iloc[window_start : window_end + 1]
     if highs.empty:
         return ExcursionResult(None, None, None, None)
 

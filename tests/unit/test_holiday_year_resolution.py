@@ -29,7 +29,7 @@ def test_required_years_late_december_needs_next_year_too():
 
 def test_covered_holiday_years_reads_yaml_keys_not_derived_dates(tmp_path):
     p = tmp_path / "holidays.yaml"
-    p.write_text("holidays:\n  2026: []\n  2027: [\"2027-01-26\"]\n")
+    p.write_text('holidays:\n  2026: []\n  2027: ["2027-01-26"]\n')
     # 2026 has an EMPTY list but is still "covered" (explicitly configured, just no remaining
     # holidays) — must not be indistinguishable from "never configured".
     assert covered_holiday_years(p) == {2026, 2027}
@@ -51,7 +51,7 @@ def test_resolve_holidays_for_run_lenient_degrades_instead_of_raising(tmp_path):
 
 def test_resolve_holidays_for_run_succeeds_when_year_covered(tmp_path):
     p = tmp_path / "holidays.yaml"
-    p.write_text("holidays:\n  2026: [\"2026-01-26\", \"2026-08-15\"]\n")
+    p.write_text('holidays:\n  2026: ["2026-01-26", "2026-08-15"]\n')
     holidays = resolve_holidays_for_run(p, date(2026, 9, 13), strict=True)
     assert date(2026, 1, 26) in holidays
     assert date(2026, 8, 15) in holidays

@@ -6,7 +6,6 @@ actually does, and explicitly characterize what it does NOT do, rather than clai
 that isn't there.
 """
 
-
 import numpy as np
 import pandas as pd
 from nse_scanner.config import ScannerConfig
@@ -49,8 +48,13 @@ def test_reconciling_with_a_matching_ca_record_reclassifies_the_gap():
     jump_date = flagged.index[30].date()
 
     ca_record = CorporateActionRecord(
-        isin="INE_TEST_0001", nse_symbol="TESTCA", action_type="SPLIT", ex_date=jump_date,
-        ratio_or_amount="1:2 (reverse split)", source="TEST_FIXTURE", retrieved_at="2026-01-01T00:00:00Z",
+        isin="INE_TEST_0001",
+        nse_symbol="TESTCA",
+        action_type="SPLIT",
+        ex_date=jump_date,
+        ratio_or_amount="1:2 (reverse split)",
+        source="TEST_FIXTURE",
+        retrieved_at="2026-01-01T00:00:00Z",
     )
     reconciled = reconcile_with_ca_calendar(flagged, [ca_record])
 
@@ -65,12 +69,13 @@ def test_the_mandatory_overshoot_ceiling_rejects_a_large_corporate_action_jump()
     already rejects a large (e.g. 100%) corporate-action-sized jump — real splits/bonuses move
     price far more than 4%, so the mandatory condition's own tight bound is incidental protection
     against the most dramatic corporate-action artifacts, even with zero CA data."""
-    close = 200.0   # doubled from ~100
+    close = 200.0  # doubled from ~100
     bb_upper = 101.0  # a tight band, unaware of the jump
     overshoot_pct = (close - bb_upper) / bb_upper * 100.0
     assert overshoot_pct > 90  # far outside the mandatory window
-    result = evaluate_mandatory(close, bb_upper, overshoot_pct, ha_body_pct=5.0,
-                                 max_bb_overshoot_pct=4.0, min_ha_body_pct=1.0)
+    result = evaluate_mandatory(
+        close, bb_upper, overshoot_pct, ha_body_pct=5.0, max_bb_overshoot_pct=4.0, min_ha_body_pct=1.0
+    )
     assert result.bb_size_ok is False
     assert result.mandatory_pass is False
 
@@ -90,8 +95,13 @@ def test_honest_limitation_a_moderate_ca_jump_can_still_land_inside_the_mandator
     overshoot_pct = (close - bb_upper) / bb_upper * 100.0
     assert 0 < overshoot_pct <= cfg.baseline.max_bb_overshoot_pct
 
-    result = evaluate_mandatory(close, bb_upper, overshoot_pct, ha_body_pct=1.5,
-                                 max_bb_overshoot_pct=cfg.baseline.max_bb_overshoot_pct,
-                                 min_ha_body_pct=cfg.baseline.min_ha_body_pct)
+    result = evaluate_mandatory(
+        close,
+        bb_upper,
+        overshoot_pct,
+        ha_body_pct=1.5,
+        max_bb_overshoot_pct=cfg.baseline.max_bb_overshoot_pct,
+        min_ha_body_pct=cfg.baseline.min_ha_body_pct,
+    )
     # This DOES currently evaluate as a pass — documenting, not silently hiding, the limitation.
     assert result.mandatory_pass is True

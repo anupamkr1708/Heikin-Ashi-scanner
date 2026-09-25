@@ -45,13 +45,12 @@ class YahooFinanceProvider(DataProvider):
         try:
             import yfinance as yf
         except ImportError as e:  # pragma: no cover - environment issue, not logic
-            raise DataProviderError(
-                "yfinance is not installed. Install the pinned version from pyproject.toml."
-            ) from e
+            raise DataProviderError("yfinance is not installed. Install the pinned version from pyproject.toml.") from e
         return yf
 
-    def fetch_history(self, symbol: str, period: str, interval: str
-                       ) -> tuple[pd.DataFrame | None, NormalizedBarMeta | None, str | None]:
+    def fetch_history(
+        self, symbol: str, period: str, interval: str
+    ) -> tuple[pd.DataFrame | None, NormalizedBarMeta | None, str | None]:
         results, errors = self.fetch_history_batch([symbol], period, interval)
         if symbol in results:
             df = results[symbol]
@@ -67,9 +66,9 @@ class YahooFinanceProvider(DataProvider):
             return df, meta, None
         return None, None, errors.get(symbol, "unknown error")
 
-    def fetch_history_batch(self, symbols: list[str], period: str, interval: str,
-                             start: str | None = None, end: str | None = None
-                             ) -> tuple[dict[str, pd.DataFrame], dict[str, str]]:
+    def fetch_history_batch(
+        self, symbols: list[str], period: str, interval: str, start: str | None = None, end: str | None = None
+    ) -> tuple[dict[str, pd.DataFrame], dict[str, str]]:
         """`start`/`end` (YYYY-MM-DD), when given, are passed to yfinance INSTEAD of `period` —
         yfinance's own API treats these as mutually exclusive-ish (an explicit date range takes
         priority), used by `bootstrap_history.py --start ... --end ...` for a precise historical
@@ -81,7 +80,7 @@ class YahooFinanceProvider(DataProvider):
 
         batch_size = self.cfg.batch_size
         for i in range(0, len(symbols), batch_size):
-            chunk = symbols[i:i + batch_size]
+            chunk = symbols[i : i + batch_size]
             data = None
             last_err: Exception | None = None
             for attempt in range(self.cfg.max_download_retries + 1):

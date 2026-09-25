@@ -81,7 +81,7 @@ class ReportType:
 @dataclass(frozen=True)
 class SecurityFileUrlTemplate:
     template: str
-    dated: bool   # False = a single static URL, not worth retrying across multiple dates
+    dated: bool  # False = a single static URL, not worth retrying across multiple dates
 
 
 # Candidate URL templates for the CM-MII security file, tried in order at each candidate date
@@ -89,10 +89,10 @@ class SecurityFileUrlTemplate:
 # live NSE circular (see module docstring) — the folder/date-availability assumption is the part
 # that was NOT confirmable from this sandbox.
 SECURITY_FILE_URL_TEMPLATES: tuple[SecurityFileUrlTemplate, ...] = (
+    SecurityFileUrlTemplate("https://nsearchives.nseindia.com/content/cm/NSE_CM_security_{ddmmyyyy}.csv.gz", True),
     SecurityFileUrlTemplate(
-        "https://nsearchives.nseindia.com/content/cm/NSE_CM_security_{ddmmyyyy}.csv.gz", True),
-    SecurityFileUrlTemplate(
-        "https://nsearchives.nseindia.com/content/equity_bhavcopy/security_{ddmmyyyy}.csv.gz", True),
+        "https://nsearchives.nseindia.com/content/equity_bhavcopy/security_{ddmmyyyy}.csv.gz", True
+    ),
     SecurityFileUrlTemplate("https://nsearchives.nseindia.com/content/equity/EQUITY_L.csv", False),
 )
 
@@ -156,13 +156,15 @@ def check_bhavcopy_availability(session_date: date, timeout: int = 10) -> Report
 # universe/mainboard.py does not need to change.
 # ==================================================================================================
 
+
 @dataclass(frozen=True)
 class DiscoveryAttempt:
     """One (template, date) combination that was tried, and exactly what happened — the fix for
     the pre-existing "tried 3 URLs, all failed" diagnostic, which gave no way to tell a genuine
     404 apart from a network failure apart from an anti-bot block page."""
+
     url: str
-    outcome: str   # "AVAILABLE" | "NOT_FOUND" | "UNREACHABLE" | "INVALID_CONTENT"
+    outcome: str  # "AVAILABLE" | "NOT_FOUND" | "UNREACHABLE" | "INVALID_CONTENT"
     detail: str | None = None
 
 
@@ -173,12 +175,10 @@ class DiscoveryResult:
 
     @property
     def summary(self) -> str:
-        return "\n".join(f"  - {a.url} -> {a.outcome}" + (f" ({a.detail})" if a.detail else "")
-                          for a in self.attempts)
+        return "\n".join(f"  - {a.url} -> {a.outcome}" + (f" ({a.detail})" if a.detail else "") for a in self.attempts)
 
 
-def discover_report(max_lookback_days: int = 10, timeout: int = 15,
-                     today: date | None = None) -> DiscoveryResult:
+def discover_report(max_lookback_days: int = 10, timeout: int = 15, today: date | None = None) -> DiscoveryResult:
     """Finds the most recent date for which the CM-MII security file is actually available.
 
     **Why this scans backward across dates rather than only checking today** (the pre-fix
@@ -283,6 +283,7 @@ def download_raw(url: str, timeout: int = 20) -> bytes:
 
 def hash_raw(raw_bytes: bytes) -> str:
     import hashlib
+
     return hashlib.sha256(raw_bytes).hexdigest()
 
 
@@ -321,8 +322,9 @@ class SecurityFileResult:
     discovery_attempts: list[DiscoveryAttempt] = field(default_factory=list)
 
 
-def fetch_security_file(timeout: int = 20, max_lookback_days: int = 10,
-                         today: date | None = None) -> SecurityFileResult:
+def fetch_security_file(
+    timeout: int = 20, max_lookback_days: int = 10, today: date | None = None
+) -> SecurityFileResult:
     """Orchestrates the full pipeline: discover_report -> resolve_download -> download_raw ->
     hash_raw -> validate_artifact -> decompress -> parse -> validate_schema (the last four are
     combined in `parse_security_file`, unchanged from before this revision — see that function's
@@ -342,8 +344,12 @@ def fetch_security_file(timeout: int = 20, max_lookback_days: int = 10,
 
     logger.info("Security file source OK: %s (%d rows)", url, len(frame))
     return SecurityFileResult(
-        frame=frame, source_url=url, retrieved_at=datetime.now(timezone.utc),
-        file_hash=file_hash, row_count=len(frame), discovery_attempts=discovery.attempts,
+        frame=frame,
+        source_url=url,
+        retrieved_at=datetime.now(timezone.utc),
+        file_hash=file_hash,
+        row_count=len(frame),
+        discovery_attempts=discovery.attempts,
     )
 
 

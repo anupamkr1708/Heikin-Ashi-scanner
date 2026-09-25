@@ -48,8 +48,12 @@ REQUIRED_COLUMNS = ("Open", "High", "Low", "Close", "Volume")
 # not part of REQUIRED_COLUMNS, but a frame containing it should still be recognized correctly.
 _OHLCV_FIELD_TOKENS = {"open", "high", "low", "close", "adj close", "volume"}
 _CANONICAL_FIELD_NAMES = {
-    "open": "Open", "high": "High", "low": "Low", "close": "Close",
-    "adj close": "Adj Close", "volume": "Volume",
+    "open": "Open",
+    "high": "High",
+    "low": "Low",
+    "close": "Close",
+    "adj close": "Adj Close",
+    "volume": "Volume",
 }
 
 
@@ -190,8 +194,7 @@ def normalize_ticker_frame(
     if isinstance(df.columns, pd.MultiIndex):
         if df.columns.nlevels != 2:
             raise FrameNormalizationError(
-                f"unsupported MultiIndex depth for ticker {ticker!r}: "
-                f"{df.columns.nlevels} levels (expected 2)"
+                f"unsupported MultiIndex depth for ticker {ticker!r}: " f"{df.columns.nlevels} levels (expected 2)"
             )
         level0_vals = list(df.columns.get_level_values(0))
         level1_vals = list(df.columns.get_level_values(1))

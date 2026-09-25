@@ -5,12 +5,14 @@ from nse_scanner.indicators.heikin_ashi import calculate_heikin_ashi, ha_body_pc
 
 def test_ha_seed_and_recursion_hand_calculated():
     # Two bars, hand-computed.
-    df = pd.DataFrame({
-        "Open": [100.0, 108.0],
-        "High": [110.0, 112.0],
-        "Low": [95.0, 104.0],
-        "Close": [105.0, 110.0],
-    })
+    df = pd.DataFrame(
+        {
+            "Open": [100.0, 108.0],
+            "High": [110.0, 112.0],
+            "Low": [95.0, 104.0],
+            "Close": [105.0, 110.0],
+        }
+    )
     ha = calculate_heikin_ashi(df)
 
     # Bar 0 (seed)
@@ -30,6 +32,7 @@ def test_ha_seed_and_recursion_hand_calculated():
 
 def test_ha_ordering_invariants_hold_on_random_data():
     import numpy as np
+
     rng = np.random.default_rng(0)
     n = 100
     opens = rng.uniform(90, 110, n)

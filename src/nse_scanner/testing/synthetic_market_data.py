@@ -32,8 +32,13 @@ def _deterministic_symbol_offset(symbol: str) -> int:
     return sum(ord(c) for c in symbol) % 1000
 
 
-def generate_synthetic_ohlcv(symbol: str, n_days: int = 80, start_price: float = 1000.0,
-                              seed: int = 42, engineer_breakout_on_last_day: bool = False) -> pd.DataFrame:
+def generate_synthetic_ohlcv(
+    symbol: str,
+    n_days: int = 80,
+    start_price: float = 1000.0,
+    seed: int = 42,
+    engineer_breakout_on_last_day: bool = False,
+) -> pd.DataFrame:
     """Deterministic random-walk OHLCV, optionally engineered so the LAST day satisfies the
     baseline BB+HA mandatory condition (used to prove the end-to-end pipeline can actually
     produce a signal in offline mode)."""
@@ -97,19 +102,27 @@ def generate_synthetic_index(n_days: int = 260, seed: int = 7) -> pd.DataFrame:
     for _ in range(n_days - 1):
         closes_list.append(closes_list[-1] * (1 + rng.normal(0.0004, 0.008)))
     closes = np.array(closes_list)
-    df = pd.DataFrame({
-        "Open": closes * 0.999, "High": closes * 1.004, "Low": closes * 0.996, "Close": closes,
-        "Volume": rng.integers(100_000_000, 300_000_000, size=n_days),
-    }, index=dates)
+    df = pd.DataFrame(
+        {
+            "Open": closes * 0.999,
+            "High": closes * 1.004,
+            "Low": closes * 0.996,
+            "Close": closes,
+            "Volume": rng.integers(100_000_000, 300_000_000, size=n_days),
+        },
+        index=dates,
+    )
     return df
 
 
 def generate_synthetic_universe() -> pd.DataFrame:
-    return pd.DataFrame({
-        "Symbol": SYNTHETIC_SYMBOLS,
-        "Company_Name": [f"{s} Limited" for s in SYNTHETIC_SYMBOLS],
-        "Sector": ["Technology", "Financials", "Energy", "Consumer", "Industrials"],
-    })
+    return pd.DataFrame(
+        {
+            "Symbol": SYNTHETIC_SYMBOLS,
+            "Company_Name": [f"{s} Limited" for s in SYNTHETIC_SYMBOLS],
+            "Sector": ["Technology", "Financials", "Energy", "Consumer", "Industrials"],
+        }
+    )
 
 
 def generate_synthetic_udiff_bhavcopy(session_date: pd.Timestamp) -> pd.DataFrame:
@@ -118,18 +131,20 @@ def generate_synthetic_udiff_bhavcopy(session_date: pd.Timestamp) -> pd.DataFram
     rows = []
     for i, sym in enumerate(SYNTHETIC_SYMBOLS):
         base = 500 + i * 137.5
-        rows.append({
-            "TradDt": session_date.strftime("%Y-%m-%d"),
-            "TckrSymb": sym,
-            "ISIN": f"INE{i:03d}A0101{i}",
-            "SctySrs": "EQ",
-            "OpnPric": round(base * 0.998, 2),
-            "HghPric": round(base * 1.015, 2),
-            "LwPric": round(base * 0.99, 2),
-            "ClsPric": round(base * 1.005, 2),
-            "TtlTradgVol": 100000 + i * 5000,
-            "TtlTrfVal": (100000 + i * 5000) * base,
-        })
+        rows.append(
+            {
+                "TradDt": session_date.strftime("%Y-%m-%d"),
+                "TckrSymb": sym,
+                "ISIN": f"INE{i:03d}A0101{i}",
+                "SctySrs": "EQ",
+                "OpnPric": round(base * 0.998, 2),
+                "HghPric": round(base * 1.015, 2),
+                "LwPric": round(base * 0.99, 2),
+                "ClsPric": round(base * 1.005, 2),
+                "TtlTradgVol": 100000 + i * 5000,
+                "TtlTrfVal": (100000 + i * 5000) * base,
+            }
+        )
     return pd.DataFrame(rows)
 
 
@@ -138,13 +153,15 @@ def generate_synthetic_security_file() -> pd.DataFrame:
     data/nse_reports.py::SECURITY_FILE_COLUMN_CANDIDATES."""
     rows = []
     for i, sym in enumerate(SYNTHETIC_SYMBOLS):
-        rows.append({
-            "SYMBOL": sym,
-            "NAME OF COMPANY": f"{sym} Limited",
-            "SERIES": "EQ",
-            "ISIN NUMBER": f"INE{i:03d}A0101{i}",
-            "DATE OF LISTING": "01-01-2010",
-            "FACE VALUE": 10,
-            "STATUS": "Active",
-        })
+        rows.append(
+            {
+                "SYMBOL": sym,
+                "NAME OF COMPANY": f"{sym} Limited",
+                "SERIES": "EQ",
+                "ISIN NUMBER": f"INE{i:03d}A0101{i}",
+                "DATE OF LISTING": "01-01-2010",
+                "FACE VALUE": 10,
+                "STATUS": "Active",
+            }
+        )
     return pd.DataFrame(rows)

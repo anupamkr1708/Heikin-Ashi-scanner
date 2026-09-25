@@ -21,10 +21,10 @@ SCORE_STATUS_UNAVAILABLE = "UNAVAILABLE"
 
 # Manually chosen weights (PART 25 / BUG 15) — explicitly NOT statistically validated.
 _WEIGHTS = {
-    "trend": 0.25,      # Dist_SMA50_Pct, clipped/normalized
-    "volume": 0.15,     # Volume_Ratio_20, clipped/normalized
-    "candle": 0.15,     # Close_Location_Value, already in [-1, 1]
-    "rs": 0.25,         # RS_20D, clipped/normalized
+    "trend": 0.25,  # Dist_SMA50_Pct, clipped/normalized
+    "volume": 0.15,  # Volume_Ratio_20, clipped/normalized
+    "candle": 0.15,  # Close_Location_Value, already in [-1, 1]
+    "rs": 0.25,  # RS_20D, clipped/normalized
     "volatility": 0.20,  # inverse of BB_Overshoot_ATR extremity
 }
 
@@ -48,8 +48,13 @@ def calculate_research_heuristic_score(row: pd.Series, benchmark_available: bool
         "trend": _norm(row.get("Dist_SMA50_Pct"), -10, 25),
         "volume": _norm(row.get("Volume_Ratio_20"), 0.5, 3.0),
         "candle": _norm(row.get("Close_Location_Value"), -1, 1),
-        "volatility": _norm(-(abs(row.get("BB_Overshoot_ATR")) if pd.notna(row.get("BB_Overshoot_ATR")) else None)
-                             if row.get("BB_Overshoot_ATR") is not None else None, -3, 0),
+        "volatility": _norm(
+            -(abs(row.get("BB_Overshoot_ATR")) if pd.notna(row.get("BB_Overshoot_ATR")) else None)
+            if row.get("BB_Overshoot_ATR") is not None
+            else None,
+            -3,
+            0,
+        ),
         "rs": _norm(row.get("RS_20D"), -15, 15) if benchmark_available else None,
     }
 
@@ -62,8 +67,8 @@ def calculate_research_heuristic_score(row: pd.Series, benchmark_available: bool
     weighted_sum = sum(usable[k] * _WEIGHTS[k] for k in usable)
     weight_total = sum(_WEIGHTS[k] for k in usable)
     score = weighted_sum / weight_total  # renormalized over AVAILABLE components only — and the
-                                          # PARTIAL status below is exactly what keeps that from
-                                          # being a silent renormalization (BUG 4/16).
+    # PARTIAL status below is exactly what keeps that from
+    # being a silent renormalization (BUG 4/16).
 
     status = SCORE_STATUS_FULL if coverage == 1.0 and benchmark_available else SCORE_STATUS_PARTIAL
     return ScoreResult(score=round(score * 100, 2), status=status, coverage=round(coverage, 2))

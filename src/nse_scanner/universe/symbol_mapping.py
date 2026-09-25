@@ -41,11 +41,15 @@ def map_symbol_to_yfinance(nse_symbol: str, override_table: dict[str, str]) -> M
     if nse_symbol in override_table:
         base = override_table[nse_symbol]
         return MappingResult(
-            yf_symbol=f"{base}{YFINANCE_SUFFIX}", method="override_table", confidence=1.0,
+            yf_symbol=f"{base}{YFINANCE_SUFFIX}",
+            method="override_table",
+            confidence=1.0,
             status=MappingStatus.OVERRIDE,
         )
     return MappingResult(
-        yf_symbol=f"{nse_symbol}{YFINANCE_SUFFIX}", method="direct_suffix", confidence=0.9,
+        yf_symbol=f"{nse_symbol}{YFINANCE_SUFFIX}",
+        method="direct_suffix",
+        confidence=0.9,
         status=MappingStatus.PENDING,
     )
 
@@ -56,6 +60,9 @@ def finalize_mapping_status(mapping: MappingResult, download_succeeded: bool) ->
     if download_succeeded:
         return MappingResult(mapping.yf_symbol, mapping.method, mapping.confidence, MappingStatus.OK)
     return MappingResult(
-        mapping.yf_symbol, mapping.method, mapping.confidence, MappingStatus.ERROR,
+        mapping.yf_symbol,
+        mapping.method,
+        mapping.confidence,
+        MappingStatus.ERROR,
         error="no data returned for mapped yfinance symbol",
     )

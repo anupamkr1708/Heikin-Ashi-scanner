@@ -22,7 +22,7 @@ NEXT_CLOSE = "next_close"
 class EntryResult:
     entry_date: pd.Timestamp | None
     entry_price: float | None
-    entry_pos: int | None          # integer row position of the entry bar within `price_df`
+    entry_pos: int | None  # integer row position of the entry bar within `price_df`
     gap_from_signal_to_entry_pct: float | None
 
 
@@ -59,6 +59,7 @@ def forward_return(price_df: pd.DataFrame, entry_pos: int, horizon_days: int) ->
     return (target_close - entry_close) / entry_close * 100.0
 
 
-def forward_returns_multi_horizon(price_df: pd.DataFrame, entry_pos: int,
-                                   horizons: tuple[int, ...] = (1, 3, 5, 10, 20, 40)) -> dict[str, float | None]:
+def forward_returns_multi_horizon(
+    price_df: pd.DataFrame, entry_pos: int, horizons: tuple[int, ...] = (1, 3, 5, 10, 20, 40)
+) -> dict[str, float | None]:
     return {f"FwdRet_{h}D": forward_return(price_df, entry_pos, h) for h in horizons}
