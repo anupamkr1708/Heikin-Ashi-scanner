@@ -165,3 +165,213 @@ def generate_synthetic_security_file() -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows)
+
+
+def generate_mainboard_semantics_fixture_cases() -> pd.DataFrame:
+    """Realistic-shaped (UDiFF raw-header) rows for the mainboard-universe-semantics forensic
+    exercise's Step 8 case list. **Synthetic, not a real NSE file** — same convention as
+    `generate_synthetic_security_file` above (see this module's docstring). Uses the exact raw
+    UDiFF column names (TckrSymb, SctySrs, DelFlg, PrtdToTrad, ElgbltyNrmlMkt, SctyStsNrmlMkt,
+    FinInstrmId, FinInstrmTp, ...) rather than the legacy EQUITY_L.csv-style names, since these
+    cases exist specifically to exercise the diagnostic-field-presence/pass-through behavior in
+    `compute_mainboard_diagnostics` — those fields are NOT in SECURITY_FILE_COLUMN_CANDIDATES, so
+    parse_security_file leaves them under these exact raw names (see nse_reports.py comment on
+    MAINBOARD_DIAGNOSTIC_FIELDS).
+
+    One row per case, `TckrSymb` names the case so test failures are self-explanatory:
+      NORMALEQ          - ordinary active, tradable, eligible EQ row
+      NORMALEQ_BE       - the SAME company's BE (surveillance) row -- same ISIN as NORMALEQ,
+                          exercises deterministic EQ-preferred dedup (Step 5/9/12)
+      ETFCASE           - series EQ, name suggests an ETF -- included exactly like any other EQ
+                          row today (no authoritative ETF field exists yet); a symbol-name
+                          heuristic is deliberately NOT used to exclude it (see the forensic
+                          report's explicit instruction against that). Present so a future
+                          authoritative exclusion mechanism has something real to test against.
+      REITCASE          - same rationale as ETFCASE, for REIT units
+      INVITCASE         - same rationale as ETFCASE, for InvIT units
+      DELETEDEQ         - DelFlg=Y -- still included today (filter_mainboard_equity does not
+                          filter on DelFlg); present so DelFlg's presence/value is visible in
+                          diagnostics even though it is not acted on
+      NONTRADABLE       - PrtdToTrad=0 -- current-operational-status field, not filtered on
+                          (see the forensic report's PrtdToTrad section on why not)
+      MKTINELIGIBLE     - ElgbltyNrmlMkt=0 -- same rationale, not filtered on
+      DUPEISIN_SAMESERIES - a second EQ row sharing NORMALEQ's ISIN but a DIFFERENT symbol/
+                          FinInstrmId -- a genuine data-quality edge case (same-ISIN, both EQ,
+                          not the normal EQ/BE pattern); deduplicate_mainboard must not silently
+                          treat this like the ordinary EQ/BE case (see Dedup_Reason)
+      SERIESCHANGED     - shares NORMALEQ's ISIN under series 'BZ' (an unranked series, not in
+                          MAINBOARD_SERIES_DEDUP_PREFERENCE) -- exercises the "unranked series
+                          sorts last, deterministically" path
+      OTHERINSTR_NCD    - series 'N1' (a non-convertible-debenture-style series) -- must be
+                          excluded by filter_mainboard_equity same as before this fixture existed;
+                          present to confirm that stays true
+    """
+    base_isin = "INE900A01019"
+    rows = [
+        dict(
+            TckrSymb="NORMALEQ",
+            FinInstrmNm="Normal Equity Ltd",
+            SctySrs="EQ",
+            ISIN=base_isin,
+            FinInstrmId="1001",
+            DelFlg="N",
+            PrtdToTrad="1",
+            ElgbltyNrmlMkt="1",
+            SctyStsNrmlMkt="1",
+            FinInstrmTp="STK",
+            ListgDt="01-01-2010",
+            RmvlDt="",
+            UpdDt="23-09-2026",
+        ),
+        dict(
+            TckrSymb="NORMALEQ",
+            FinInstrmNm="Normal Equity Ltd",
+            SctySrs="BE",
+            ISIN=base_isin,
+            FinInstrmId="1002",
+            DelFlg="N",
+            PrtdToTrad="1",
+            ElgbltyNrmlMkt="1",
+            SctyStsNrmlMkt="1",
+            FinInstrmTp="STK",
+            ListgDt="01-01-2010",
+            RmvlDt="",
+            UpdDt="23-09-2026",
+        ),
+        dict(
+            TckrSymb="ETFCASE",
+            FinInstrmNm="Synthetic Nifty ETF",
+            SctySrs="EQ",
+            ISIN="INE901A01011",
+            FinInstrmId="1003",
+            DelFlg="N",
+            PrtdToTrad="1",
+            ElgbltyNrmlMkt="1",
+            SctyStsNrmlMkt="1",
+            FinInstrmTp="STK",
+            ListgDt="01-01-2015",
+            RmvlDt="",
+            UpdDt="23-09-2026",
+        ),
+        dict(
+            TckrSymb="REITCASE",
+            FinInstrmNm="Synthetic Office Parks REIT",
+            SctySrs="EQ",
+            ISIN="INE902A01012",
+            FinInstrmId="1004",
+            DelFlg="N",
+            PrtdToTrad="1",
+            ElgbltyNrmlMkt="1",
+            SctyStsNrmlMkt="1",
+            FinInstrmTp="STK",
+            ListgDt="01-01-2019",
+            RmvlDt="",
+            UpdDt="23-09-2026",
+        ),
+        dict(
+            TckrSymb="INVITCASE",
+            FinInstrmNm="Synthetic Infra InvIT",
+            SctySrs="EQ",
+            ISIN="INE903A01013",
+            FinInstrmId="1005",
+            DelFlg="N",
+            PrtdToTrad="1",
+            ElgbltyNrmlMkt="1",
+            SctyStsNrmlMkt="1",
+            FinInstrmTp="STK",
+            ListgDt="01-01-2017",
+            RmvlDt="",
+            UpdDt="23-09-2026",
+        ),
+        dict(
+            TckrSymb="DELETEDEQ",
+            FinInstrmNm="Deleted Equity Ltd",
+            SctySrs="EQ",
+            ISIN="INE904A01014",
+            FinInstrmId="1006",
+            DelFlg="Y",
+            PrtdToTrad="0",
+            ElgbltyNrmlMkt="0",
+            SctyStsNrmlMkt="3",
+            FinInstrmTp="STK",
+            ListgDt="01-01-2011",
+            RmvlDt="10-03-2026",
+            UpdDt="10-03-2026",
+        ),
+        dict(
+            TckrSymb="NONTRADABLE",
+            FinInstrmNm="Non Tradable Ltd",
+            SctySrs="EQ",
+            ISIN="INE905A01015",
+            FinInstrmId="1007",
+            DelFlg="N",
+            PrtdToTrad="0",
+            ElgbltyNrmlMkt="1",
+            SctyStsNrmlMkt="1",
+            FinInstrmTp="STK",
+            ListgDt="01-01-2012",
+            RmvlDt="",
+            UpdDt="23-09-2026",
+        ),
+        dict(
+            TckrSymb="MKTINELIGIBLE",
+            FinInstrmNm="Market Ineligible Ltd",
+            SctySrs="EQ",
+            ISIN="INE906A01016",
+            FinInstrmId="1008",
+            DelFlg="N",
+            PrtdToTrad="1",
+            ElgbltyNrmlMkt="0",
+            SctyStsNrmlMkt="2",
+            FinInstrmTp="STK",
+            ListgDt="01-01-2013",
+            RmvlDt="",
+            UpdDt="23-09-2026",
+        ),
+        dict(
+            TckrSymb="DUPEISIN_SAMESERIES",
+            FinInstrmNm="Same Isin Same Series Ltd",
+            SctySrs="EQ",
+            ISIN=base_isin,
+            FinInstrmId="1009",
+            DelFlg="N",
+            PrtdToTrad="1",
+            ElgbltyNrmlMkt="1",
+            SctyStsNrmlMkt="1",
+            FinInstrmTp="STK",
+            ListgDt="01-01-2010",
+            RmvlDt="",
+            UpdDt="23-09-2026",
+        ),
+        dict(
+            TckrSymb="SERIESCHANGED",
+            FinInstrmNm="Series Changed Ltd",
+            SctySrs="BZ",
+            ISIN=base_isin,
+            FinInstrmId="1010",
+            DelFlg="N",
+            PrtdToTrad="0",
+            ElgbltyNrmlMkt="0",
+            SctyStsNrmlMkt="6",
+            FinInstrmTp="STK",
+            ListgDt="01-01-2010",
+            RmvlDt="",
+            UpdDt="23-09-2026",
+        ),
+        dict(
+            TckrSymb="OTHERINSTR_NCD",
+            FinInstrmNm="Some Co Non Convertible Debenture",
+            SctySrs="N1",
+            ISIN="INE907A07018",
+            FinInstrmId="1011",
+            DelFlg="N",
+            PrtdToTrad="1",
+            ElgbltyNrmlMkt="1",
+            SctyStsNrmlMkt="1",
+            FinInstrmTp="DEB",
+            ListgDt="01-01-2020",
+            RmvlDt="",
+            UpdDt="23-09-2026",
+        ),
+    ]
+    return pd.DataFrame(rows)
