@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Thin launcher — see nse_scanner.cli.bootstrap_history for the full implementation/docstring."""
+
 import sys
 from pathlib import Path
 

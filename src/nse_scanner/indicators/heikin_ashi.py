@@ -74,4 +74,4 @@ def seed_dependency_weight(bars_since_seed: int) -> float:
     """
     if bars_since_seed < 0:
         raise ValueError("bars_since_seed must be >= 0")
-    return 0.5 ** bars_since_seed
+    return 0.5**bars_since_seed

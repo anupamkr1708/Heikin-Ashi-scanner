@@ -29,8 +29,9 @@ class AsOfDataProvider(DataProvider):
     price_basis: str = "RAW"  # static fallback label; see fetch_history for the real per-symbol value
     store: object = field(default=None)  # nse_scanner.data.storage.MarketDataStore, injected
 
-    def fetch_history(self, symbol: str, period: str, interval: str
-                       ) -> tuple[pd.DataFrame | None, NormalizedBarMeta | None, str | None]:
+    def fetch_history(
+        self, symbol: str, period: str, interval: str
+    ) -> tuple[pd.DataFrame | None, NormalizedBarMeta | None, str | None]:
         if self.store is None:
             return None, None, "AsOfDataProvider has no local store configured"
         df = self.store.read_symbol_history(symbol, as_of=self.as_of_date)  # type: ignore[attr-defined]
@@ -38,13 +39,19 @@ class AsOfDataProvider(DataProvider):
             return None, None, f"no locally-ingested history for this symbol on or before {self.as_of_date}"
         actual_price_basis = self.store.price_basis_composition(symbol, as_of=self.as_of_date)  # type: ignore[attr-defined]
         meta = NormalizedBarMeta(
-            isin=None, nse_symbol=symbol, source=self.name, price_basis=actual_price_basis,
-            interval=interval, retrieved_at=datetime.now(timezone.utc), provider_version="asof_replay",
+            isin=None,
+            nse_symbol=symbol,
+            source=self.name,
+            price_basis=actual_price_basis,
+            interval=interval,
+            retrieved_at=datetime.now(timezone.utc),
+            provider_version="asof_replay",
         )
         return df, meta, None
 
-    def fetch_history_batch(self, symbols: list[str], period: str, interval: str
-                             ) -> tuple[dict[str, pd.DataFrame], dict[str, str]]:
+    def fetch_history_batch(
+        self, symbols: list[str], period: str, interval: str
+    ) -> tuple[dict[str, pd.DataFrame], dict[str, str]]:
         results: dict[str, pd.DataFrame] = {}
         errors: dict[str, str] = {}
         for sym in symbols:

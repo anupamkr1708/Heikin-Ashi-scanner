@@ -31,8 +31,9 @@ NSE_NIFTY200_URLS = (
 )
 
 NSE_HEADERS = {
-    "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                    "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"),
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+    ),
     "Accept": "text/csv,application/csv,text/plain,*/*",
     "Accept-Language": "en-US,en;q=0.9",
     "Referer": "https://www.niftyindices.com/",
@@ -55,9 +56,7 @@ def parse_constituent_csv(text: str, source_label: str, min_count: int, max_coun
     df = df.rename(columns=col_map)
 
     if "Symbol" not in df.columns:
-        raise UniverseIntegrityError(
-            f"[{source_label}] 'Symbol' column not found. Columns present: {list(df.columns)}"
-        )
+        raise UniverseIntegrityError(f"[{source_label}] 'Symbol' column not found. Columns present: {list(df.columns)}")
 
     df["Symbol"] = df["Symbol"].astype(str).str.strip().str.upper()
     df = df[df["Symbol"].str.len() > 0].reset_index(drop=True)
@@ -97,6 +96,7 @@ class NSENifty200UniverseProvider(UniverseProvider):
 
         if self.override_csv_path:
             import os
+
             if not os.path.exists(self.override_csv_path):
                 raise UniverseIntegrityError(
                     f"constituent_override_csv_path is set to '{self.override_csv_path}' but that "
@@ -104,8 +104,7 @@ class NSENifty200UniverseProvider(UniverseProvider):
                 )
             with open(self.override_csv_path, "r", encoding="utf-8") as f:
                 text = f.read()
-            df = parse_constituent_csv(text, f"USER_OVERRIDE:{self.override_csv_path}",
-                                        self.min_count, self.max_count)
+            df = parse_constituent_csv(text, f"USER_OVERRIDE:{self.override_csv_path}", self.min_count, self.max_count)
             return df, f"USER_OVERRIDE_CSV:{self.override_csv_path}", retrieval_ts.isoformat()
 
         session = requests.Session()

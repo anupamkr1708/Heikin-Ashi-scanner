@@ -19,27 +19,30 @@ from nse_scanner.models.security import SecurityRecord
 from nse_scanner.universe.symbol_mapping import map_symbol_to_yfinance
 
 
-def build_security_master(constituents_df: pd.DataFrame, override_table: dict[str, str],
-                           source: str, source_version: str | None) -> list[SecurityRecord]:
+def build_security_master(
+    constituents_df: pd.DataFrame, override_table: dict[str, str], source: str, source_version: str | None
+) -> list[SecurityRecord]:
     now = datetime.now(timezone.utc)
     records: list[SecurityRecord] = []
     for row in constituents_df.itertuples(index=False):
         mapping = map_symbol_to_yfinance(row.Symbol, override_table)
         isin = getattr(row, "ISIN", None)
-        records.append(SecurityRecord(
-            isin=isin if isin else f"UNKNOWN:{row.Symbol}",
-            nse_symbol=row.Symbol,
-            company_name=getattr(row, "Company_Name", row.Symbol),
-            sector=getattr(row, "Sector", None),
-            yf_symbol=mapping.yf_symbol,
-            mapping_status=mapping.status,
-            mapping_method=mapping.method,
-            mapping_confidence=mapping.confidence,
-            source=source,
-            source_version=source_version,
-            retrieved_at=now,
-            updated_at=now,
-        ))
+        records.append(
+            SecurityRecord(
+                isin=isin if isin else f"UNKNOWN:{row.Symbol}",
+                nse_symbol=row.Symbol,
+                company_name=getattr(row, "Company_Name", row.Symbol),
+                sector=getattr(row, "Sector", None),
+                yf_symbol=mapping.yf_symbol,
+                mapping_status=mapping.status,
+                mapping_method=mapping.method,
+                mapping_confidence=mapping.confidence,
+                source=source,
+                source_version=source_version,
+                retrieved_at=now,
+                updated_at=now,
+            )
+        )
     return records
 
 

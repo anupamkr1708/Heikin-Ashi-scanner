@@ -27,10 +27,16 @@ def _index_df(dates: list[str]) -> pd.DataFrame:
     n = len(idx)
     rng = np.random.default_rng(0)
     close = 100 + np.cumsum(rng.uniform(-1, 1, size=n))
-    return pd.DataFrame({
-        "Open": close - 0.5, "High": close + 1, "Low": close - 1, "Close": close,
-        "Volume": rng.integers(1000, 5000, size=n),
-    }, index=idx)
+    return pd.DataFrame(
+        {
+            "Open": close - 0.5,
+            "High": close + 1,
+            "Low": close - 1,
+            "Close": close,
+            "Volume": rng.integers(1000, 5000, size=n),
+        },
+        index=idx,
+    )
 
 
 def _multiindex_single_ticker_df(dates: list[str], ticker: str = "^NSEI") -> pd.DataFrame:
@@ -45,6 +51,7 @@ def cfg() -> DataConfig:
 
 
 # --- basic shapes -----------------------------------------------------------------------------
+
 
 def test_plain_columns_single_ticker(cfg):
     df = _index_df(["2026-01-01", "2026-01-02", "2026-01-05"])
@@ -122,6 +129,7 @@ def test_missing_required_field_is_reported_not_raised(cfg):
 
 # --- AS-OF cutoff (the gap this file was primarily added to close) ----------------------------
 
+
 def test_live_provider_has_no_as_of_cutoff_by_default(cfg):
     provider = YahooBenchmarkProvider(cfg)
     assert provider.as_of_date is None
@@ -177,6 +185,7 @@ def test_as_of_provider_boundary_is_inclusive(cfg):
 
 # --- P1 provider-hardening: exact test names requested for the as-of contract, alongside the
 # equivalent (differently-named) coverage above, which must remain per the checkpoint rules.
+
 
 def test_as_of_excludes_future_rows(cfg):
     df = _index_df(["2026-09-21", "2026-09-22", "2026-09-23"])

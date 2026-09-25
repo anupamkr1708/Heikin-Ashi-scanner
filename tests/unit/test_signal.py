@@ -3,8 +3,14 @@ from nse_scanner.strategy.bb_ha import evaluate_mandatory, evaluate_mandatory_ve
 
 
 def test_mandatory_all_pass():
-    r = evaluate_mandatory(close=104.0, bb_upper=100.0, bb_overshoot_pct=4.0, ha_body_pct=1.5,
-                            max_bb_overshoot_pct=4.0, min_ha_body_pct=1.0)
+    r = evaluate_mandatory(
+        close=104.0,
+        bb_upper=100.0,
+        bb_overshoot_pct=4.0,
+        ha_body_pct=1.5,
+        max_bb_overshoot_pct=4.0,
+        min_ha_body_pct=1.0,
+    )
     assert r.bb_breakout is True
     assert r.bb_size_ok is True
     assert r.ha_strength_ok is True
@@ -26,8 +32,14 @@ def test_mandatory_fails_when_overshoot_too_large():
 
 
 def test_mandatory_boundary_inclusive_at_max_overshoot():
-    r = evaluate_mandatory(close=104.0, bb_upper=100.0, bb_overshoot_pct=4.0, ha_body_pct=1.0,
-                            max_bb_overshoot_pct=4.0, min_ha_body_pct=1.0)
+    r = evaluate_mandatory(
+        close=104.0,
+        bb_upper=100.0,
+        bb_overshoot_pct=4.0,
+        ha_body_pct=1.0,
+        max_bb_overshoot_pct=4.0,
+        min_ha_body_pct=1.0,
+    )
     assert r.mandatory_pass is True  # <=, not <
 
 

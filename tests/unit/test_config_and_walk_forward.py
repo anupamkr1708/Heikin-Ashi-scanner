@@ -28,6 +28,7 @@ def test_invalid_universe_scope_rejected():
     cfg = ScannerConfig()
     bad = cfg
     from dataclasses import replace
+
     bad = replace(cfg, universe=replace(cfg.universe, universe_scope="NOT_A_REAL_UNIVERSE"))
     with pytest.raises(ConfigurationError):
         bad.validate()

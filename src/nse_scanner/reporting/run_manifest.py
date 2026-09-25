@@ -72,11 +72,21 @@ class RunManifest:
         return Path(path)
 
 
-def build_run_manifest(run_id: str, cfg: ScannerConfig, universe_id: str, universe_snapshot_date: str | None,
-                        universe_source: str | None, constituent_count: int | None, data_provider: str,
-                        data_as_of: str | None, expected_session: str | None, signal_date: str | None,
-                        status: str, price_basis: str | None = None,
-                        extra: dict[str, Any] | None = None) -> RunManifest:
+def build_run_manifest(
+    run_id: str,
+    cfg: ScannerConfig,
+    universe_id: str,
+    universe_snapshot_date: str | None,
+    universe_source: str | None,
+    constituent_count: int | None,
+    data_provider: str,
+    data_as_of: str | None,
+    expected_session: str | None,
+    signal_date: str | None,
+    status: str,
+    price_basis: str | None = None,
+    extra: dict[str, Any] | None = None,
+) -> RunManifest:
     """`price_basis` should be the ACTUAL basis the data provider returned
     (e.g. `ScanRunResult.price_basis`) — NOT blindly copied from `cfg.data.price_basis`, which is
     only a configured default/intent and can silently diverge from reality (the NSE bhavcopy path

@@ -12,9 +12,7 @@ import sys
 
 _CONFIGURED = False
 
-LOG_FORMAT = (
-    "%(asctime)s | %(levelname)-7s | %(name)s | %(message)s"
-)
+LOG_FORMAT = "%(asctime)s | %(levelname)-7s | %(name)s | %(message)s"
 
 
 def configure_logging(level: int = logging.INFO, logfile: str | None = None) -> None:
@@ -34,13 +32,19 @@ def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(name)
 
 
-def log_failure(logger: logging.Logger, *, run_id: str, security: str, stage: str,
-                 provider: str, exc: Exception) -> None:
+def log_failure(
+    logger: logging.Logger, *, run_id: str, security: str, stage: str, provider: str, exc: Exception
+) -> None:
     """Standard one-line structured failure log used by the ingestion/scan pipelines.
 
     Never logs full OHLCV payloads (PART 76) — only identifiers and the exception summary.
     """
     logger.warning(
         "run_id=%s security=%s stage=%s provider=%s error_type=%s message=%s",
-        run_id, security, stage, provider, type(exc).__name__, str(exc),
+        run_id,
+        security,
+        stage,
+        provider,
+        type(exc).__name__,
+        str(exc),
     )

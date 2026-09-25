@@ -58,6 +58,7 @@ def _price_first_multiindex(dates: list[str], ticker: str = "^NSEI", seed: int =
 
 # --- 1. plain single-level columns -------------------------------------------------------------
 
+
 def test_plain_single_level():
     df = _plain_ohlcv(["2026-09-21", "2026-09-22"])
     out = normalize_ticker_frame(df, "^NSEI")
@@ -67,6 +68,7 @@ def test_plain_single_level():
 
 # --- 2/3. both real MultiIndex orientations, order-independent ---------------------------------
 
+
 def test_ticker_first_multiindex():
     """The EXACT real shape that broke production: names=['Ticker','Price'], level0=ticker."""
     df = _ticker_first_multiindex(["2026-09-21", "2026-09-22"])
@@ -75,8 +77,9 @@ def test_ticker_first_multiindex():
     assert len(out) == 2
     # Prove real values survived the extraction correctly, not just column names.
     raw_close = df[("^NSEI", "Close")]
-    pd.testing.assert_series_equal(out["Close"], raw_close.rename("Close"),
-                                    check_index_type=False, check_freq=False, check_names=False)
+    pd.testing.assert_series_equal(
+        out["Close"], raw_close.rename("Close"), check_index_type=False, check_freq=False, check_names=False
+    )
 
 
 def test_price_first_multiindex():
@@ -86,8 +89,9 @@ def test_price_first_multiindex():
     assert list(out.columns[:4]) == ["Open", "High", "Low", "Close"]
     assert len(out) == 2
     raw_close = df[("Close", "^NSEI")]
-    pd.testing.assert_series_equal(out["Close"], raw_close.rename("Close"),
-                                    check_index_type=False, check_freq=False, check_names=False)
+    pd.testing.assert_series_equal(
+        out["Close"], raw_close.rename("Close"), check_index_type=False, check_freq=False, check_names=False
+    )
 
 
 def test_orientation_detected_from_values_not_position():
@@ -100,6 +104,7 @@ def test_orientation_detected_from_values_not_position():
 
 
 # --- 4/5. ticker extraction, single- and multi-ticker frames ------------------------------------
+
 
 def test_single_ticker_extraction():
     """A single-ticker MultiIndex frame extracts correctly even when the requested ticker string
@@ -124,33 +129,53 @@ def test_multi_ticker_extraction():
     out_nsei = normalize_ticker_frame(combined, "^NSEI")
     out_other = normalize_ticker_frame(combined, "RELIANCE.NS")
 
-    pd.testing.assert_series_equal(out_nsei["Close"], nsei[("^NSEI", "Close")].rename("Close"),
-                                    check_index_type=False, check_freq=False, check_names=False)
-    pd.testing.assert_series_equal(out_other["Close"], other[("RELIANCE.NS", "Close")].rename("Close"),
-                                    check_index_type=False, check_freq=False, check_names=False)
+    pd.testing.assert_series_equal(
+        out_nsei["Close"],
+        nsei[("^NSEI", "Close")].rename("Close"),
+        check_index_type=False,
+        check_freq=False,
+        check_names=False,
+    )
+    pd.testing.assert_series_equal(
+        out_other["Close"],
+        other[("RELIANCE.NS", "Close")].rename("Close"),
+        check_index_type=False,
+        check_freq=False,
+        check_names=False,
+    )
     assert not out_nsei["Close"].equals(out_other["Close"])
 
 
 def test_unrequested_ticker_missing_from_multi_ticker_frame_fails_clearly():
     dates = ["2026-09-21", "2026-09-22"]
-    combined = pd.concat([
-        _ticker_first_multiindex(dates, ticker="^NSEI", seed=1),
-        _ticker_first_multiindex(dates, ticker="RELIANCE.NS", seed=2),
-    ], axis=1)
+    combined = pd.concat(
+        [
+            _ticker_first_multiindex(dates, ticker="^NSEI", seed=1),
+            _ticker_first_multiindex(dates, ticker="RELIANCE.NS", seed=2),
+        ],
+        axis=1,
+    )
     with pytest.raises(FrameNormalizationError, match="TCS.NS"):
         normalize_ticker_frame(combined, "TCS.NS")
 
 
 # --- 6. zero index volume, using the EXACT real 2026-09-22 ^NSEI row ----------------------------
 
+
 def test_zero_index_volume_is_allowed():
     """Exact real row from the production report: 2026-09-22, Open=23454.050781,
     High=23489.000000, Low=23285.750000, Close=23329.000000, Volume=0. Must NOT be rejected for
     having zero volume — index volume semantics differ from security OHLCV validation."""
-    df = pd.DataFrame({
-        "Open": [23454.050781], "High": [23489.000000],
-        "Low": [23285.750000], "Close": [23329.000000], "Volume": [0],
-    }, index=pd.DatetimeIndex(["2026-09-22"]))
+    df = pd.DataFrame(
+        {
+            "Open": [23454.050781],
+            "High": [23489.000000],
+            "Low": [23285.750000],
+            "Close": [23329.000000],
+            "Volume": [0],
+        },
+        index=pd.DatetimeIndex(["2026-09-22"]),
+    )
     out = normalize_ticker_frame(df, "^NSEI")
     assert len(out) == 1
     assert out.iloc[0]["Volume"] == 0
@@ -165,6 +190,7 @@ def test_volume_absent_is_not_fabricated():
 
 # --- 7. missing required OHLC field --------------------------------------------------------------
 
+
 def test_missing_required_ohlc_fails():
     df = _plain_ohlcv(["2026-09-21", "2026-09-22"]).drop(columns=["Close"])
     with pytest.raises(FrameNormalizationError, match="Close"):
@@ -173,14 +199,21 @@ def test_missing_required_ohlc_fails():
 
 # --- 8. duplicate dates, deterministic policy ----------------------------------------------------
 
+
 def test_duplicate_dates_are_deterministically_handled():
     """Documented policy: for a duplicated date, the row that appeared LAST in the original
     (pre-sort) frame wins — mirrors normalize_ohlcv_columns's existing stock-path convention. This
     test proves the SPECIFIC surviving value, not merely that normalization doesn't crash."""
-    df = pd.DataFrame({
-        "Open": [100.0, 999.0], "High": [101.0, 999.0], "Low": [99.0, 999.0],
-        "Close": [100.5, 999.0], "Volume": [10, 20],
-    }, index=pd.DatetimeIndex(["2026-09-22", "2026-09-22"]))  # same date, appears twice
+    df = pd.DataFrame(
+        {
+            "Open": [100.0, 999.0],
+            "High": [101.0, 999.0],
+            "Low": [99.0, 999.0],
+            "Close": [100.5, 999.0],
+            "Volume": [10, 20],
+        },
+        index=pd.DatetimeIndex(["2026-09-22", "2026-09-22"]),
+    )  # same date, appears twice
     out = normalize_ticker_frame(df, "^NSEI")
     assert len(out) == 1
     assert out.iloc[0]["Close"] == 999.0  # the LAST-occurring row for that date wins
@@ -188,6 +221,7 @@ def test_duplicate_dates_are_deterministically_handled():
 
 
 # --- 9-11. None / empty / unsupported structures --------------------------------------------------
+
 
 def test_none_input_fails_clearly():
     with pytest.raises(FrameNormalizationError, match="no_data_returned"):
@@ -202,9 +236,7 @@ def test_empty_input_fails_clearly():
 def test_three_level_multiindex_is_rejected_not_silently_guessed():
     dates = ["2026-09-21", "2026-09-22"]
     df = _ticker_first_multiindex(dates)
-    df.columns = pd.MultiIndex.from_tuples(
-        [(*c, "extra") for c in df.columns], names=[*df.columns.names, "Extra"]
-    )
+    df.columns = pd.MultiIndex.from_tuples([(*c, "extra") for c in df.columns], names=[*df.columns.names, "Extra"])
     with pytest.raises(FrameNormalizationError, match="expected 2"):
         normalize_ticker_frame(df, "^NSEI")
 

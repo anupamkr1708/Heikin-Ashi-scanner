@@ -8,10 +8,16 @@ def _ohlcv_index(n=5):
 
 
 def test_single_ticker_plain_columns():
-    df = pd.DataFrame({
-        "Open": [1, 2, 3], "High": [1.1, 2.1, 3.1], "Low": [0.9, 1.9, 2.9],
-        "Close": [1.05, 2.05, 3.05], "Volume": [100, 200, 300],
-    }, index=_ohlcv_index(3))
+    df = pd.DataFrame(
+        {
+            "Open": [1, 2, 3],
+            "High": [1.1, 2.1, 3.1],
+            "Low": [0.9, 1.9, 2.9],
+            "Close": [1.05, 2.05, 3.05],
+            "Volume": [100, 200, 300],
+        },
+        index=_ohlcv_index(3),
+    )
     out = extract_symbol_frame(df, "FOO", batch_size=1)
     assert out is not None
     assert {"Open", "High", "Low", "Close", "Volume"}.issubset(set(out.columns))
@@ -63,18 +69,32 @@ def test_empty_response_returns_none():
 
 def test_all_nan_response_treated_as_empty():
     idx = _ohlcv_index(3)
-    df = pd.DataFrame({"Open": [np.nan] * 3, "High": [np.nan] * 3, "Low": [np.nan] * 3,
-                        "Close": [np.nan] * 3, "Volume": [np.nan] * 3}, index=idx)
+    df = pd.DataFrame(
+        {
+            "Open": [np.nan] * 3,
+            "High": [np.nan] * 3,
+            "Low": [np.nan] * 3,
+            "Close": [np.nan] * 3,
+            "Volume": [np.nan] * 3,
+        },
+        index=idx,
+    )
     out = extract_symbol_frame(df, "FOO", batch_size=1)
     assert out is None
 
 
 def test_normalize_ohlcv_columns_coerces_numeric_and_drops_dupe_index():
     idx = pd.DatetimeIndex(["2025-01-01", "2025-01-01", "2025-01-02"])
-    df = pd.DataFrame({
-        "Open": ["1", "1.5", "2"], "High": ["1.1", "1.6", "2.1"], "Low": ["0.9", "1.4", "1.9"],
-        "Close": ["1.05", "1.55", "2.05"], "Volume": ["100", "150", "200"],
-    }, index=idx)
+    df = pd.DataFrame(
+        {
+            "Open": ["1", "1.5", "2"],
+            "High": ["1.1", "1.6", "2.1"],
+            "Low": ["0.9", "1.4", "1.9"],
+            "Close": ["1.05", "1.55", "2.05"],
+            "Volume": ["100", "150", "200"],
+        },
+        index=idx,
+    )
     out = normalize_ohlcv_columns(df)
     assert len(out) == 2  # duplicate date collapsed, keep last
     assert out["Close"].dtype.kind == "f"

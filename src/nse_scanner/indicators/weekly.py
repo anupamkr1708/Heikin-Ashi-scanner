@@ -35,13 +35,15 @@ def build_weekly_ohlc(daily_df: pd.DataFrame) -> pd.DataFrame:
     week_key = pd.Series(iso["year"].to_numpy() * 100 + iso["week"].to_numpy(), index=daily_df.index)
 
     grouped = daily_df.groupby(week_key)
-    weekly = pd.DataFrame({
-        "Open": grouped["Open"].first(),
-        "High": grouped["High"].max(),
-        "Low": grouped["Low"].min(),
-        "Close": grouped["Close"].last(),
-        "Volume": grouped["Volume"].sum(),
-    })
+    weekly = pd.DataFrame(
+        {
+            "Open": grouped["Open"].first(),
+            "High": grouped["High"].max(),
+            "Low": grouped["Low"].min(),
+            "Close": grouped["Close"].last(),
+            "Volume": grouped["Volume"].sum(),
+        }
+    )
     fridays = [date.fromisocalendar(int(k) // 100, int(k) % 100, 5) for k in weekly.index]
     weekly.index = pd.DatetimeIndex(fridays, name="week_ends_on")
     weekly = weekly.sort_index()

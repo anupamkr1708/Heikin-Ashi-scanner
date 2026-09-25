@@ -38,8 +38,19 @@ import pandas as pd
 from nse_scanner.exceptions import StorageError
 
 EOD_PRICES_SCHEMA = (
-    "nse_symbol", "isin", "trade_date", "open", "high", "low", "close", "volume", "turnover",
-    "source", "price_basis", "schema_version", "ingested_at",
+    "nse_symbol",
+    "isin",
+    "trade_date",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "turnover",
+    "source",
+    "price_basis",
+    "schema_version",
+    "ingested_at",
 )
 
 PRICE_BASIS_RAW = "RAW"
@@ -194,9 +205,7 @@ class MarketDataStore:
                     [nse_symbol],
                 ).fetchone()
             else:
-                row = con.execute(
-                    f"SELECT max(trade_date) FROM read_parquet('{self._eod_glob()}')"
-                ).fetchone()
+                row = con.execute(f"SELECT max(trade_date) FROM read_parquet('{self._eod_glob()}')").fetchone()
         finally:
             con.close()
         return pd.Timestamp(row[0]) if row and row[0] is not None else None

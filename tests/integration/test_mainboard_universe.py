@@ -8,9 +8,13 @@ from nse_scanner.universe.mainboard import NSEMainboardEquityUniverseProvider
 
 def _fake_security_result(frame: pd.DataFrame) -> SecurityFileResult:
     import pandas as pd
+
     return SecurityFileResult(
-        frame=frame, source_url="https://fake/security_file.csv.gz",
-        retrieved_at=pd.Timestamp("2026-09-13", tz="UTC"), file_hash="deadbeef", row_count=len(frame),
+        frame=frame,
+        source_url="https://fake/security_file.csv.gz",
+        retrieved_at=pd.Timestamp("2026-09-13", tz="UTC"),
+        file_hash="deadbeef",
+        row_count=len(frame),
     )
 
 
@@ -19,10 +23,10 @@ def test_mainboard_provider_derives_universe_from_security_master(monkeypatch):
     import gzip
 
     from nse_scanner.data.nse_reports import parse_security_file
+
     parsed = parse_security_file(gzip.compress(raw.to_csv(index=False).encode("utf-8")))
 
-    monkeypatch.setattr("nse_scanner.universe.mainboard.fetch_security_file",
-                         lambda: _fake_security_result(parsed))
+    monkeypatch.setattr("nse_scanner.universe.mainboard.fetch_security_file", lambda: _fake_security_result(parsed))
 
     provider = NSEMainboardEquityUniverseProvider(min_count=1, max_count=100)
     constituents, source, retrieved_at = provider.get_constituents()
@@ -38,10 +42,10 @@ def test_mainboard_provider_excludes_non_eq_be_series(monkeypatch):
     import gzip
 
     from nse_scanner.data.nse_reports import parse_security_file
+
     parsed = parse_security_file(gzip.compress(raw.to_csv(index=False).encode("utf-8")))
 
-    monkeypatch.setattr("nse_scanner.universe.mainboard.fetch_security_file",
-                         lambda: _fake_security_result(parsed))
+    monkeypatch.setattr("nse_scanner.universe.mainboard.fetch_security_file", lambda: _fake_security_result(parsed))
 
     provider = NSEMainboardEquityUniverseProvider(min_count=1, max_count=100)
     constituents, _source, _retrieved_at = provider.get_constituents()
@@ -64,10 +68,10 @@ def test_mainboard_provider_hard_fails_on_implausible_count(monkeypatch):
     import gzip
 
     from nse_scanner.data.nse_reports import parse_security_file
+
     parsed = parse_security_file(gzip.compress(raw.to_csv(index=False).encode("utf-8")))
 
-    monkeypatch.setattr("nse_scanner.universe.mainboard.fetch_security_file",
-                         lambda: _fake_security_result(parsed))
+    monkeypatch.setattr("nse_scanner.universe.mainboard.fetch_security_file", lambda: _fake_security_result(parsed))
 
     # Sanity bounds set far above what the tiny synthetic fixture can satisfy -> must hard-fail,
     # never silently accept an implausibly small "mainboard" universe.

@@ -42,6 +42,7 @@ class _Resp:
     def raise_for_status(self):
         if self.status_code >= 400:
             import requests
+
             raise requests.HTTPError(f"HTTP {self.status_code}")
 
 
@@ -54,19 +55,23 @@ def _security_csv_bytes(gzip_it: bool = True) -> bytes:
 def _mock_get_factory(responses_by_url: dict[str, _Resp], homepage_ok: bool = True):
     """`responses_by_url` maps an exact URL to the _Resp it should return; the NSE homepage
     warm-up GET (no Range header, different URL) always succeeds unless homepage_ok=False."""
+
     def _get(self, url, timeout=None, headers=None):
         if url == "https://www.nseindia.com":
             if not homepage_ok:
                 import requests
+
                 raise requests.ConnectionError("homepage unreachable")
             return _Resp(200, b"<html>homepage</html>")
         if url in responses_by_url:
             return responses_by_url[url]
         return _Resp(404)
+
     return _get
 
 
 # --- discover_report: date-backward scanning ----------------------------------------------------
+
 
 def test_discover_finds_todays_file_on_first_try():
     today = date(2026, 9, 22)
@@ -82,8 +87,9 @@ def test_discover_scans_backward_when_todays_date_404s():
     treated as 'discovery is broken' just because TODAY's exact date 404s."""
     today = date(2026, 9, 22)
     three_days_ago = date(2026, 9, 19)
-    good_url = (f"https://nsearchives.nseindia.com/content/cm/"
-                f"NSE_CM_security_{three_days_ago.strftime('%d%m%Y')}.csv.gz")
+    good_url = (
+        f"https://nsearchives.nseindia.com/content/cm/" f"NSE_CM_security_{three_days_ago.strftime('%d%m%Y')}.csv.gz"
+    )
     with patch("requests.Session.get", _mock_get_factory({good_url: _Resp(200, _security_csv_bytes())})):
         result = discover_report(max_lookback_days=5, today=today)
     assert result.found_url == good_url
@@ -107,10 +113,15 @@ def test_discover_picks_the_correct_dates_file_not_a_neighboring_one():
     today = date(2026, 9, 22)
     url_today = "https://nsearchives.nseindia.com/content/cm/NSE_CM_security_22092026.csv.gz"
     url_yesterday = "https://nsearchives.nseindia.com/content/cm/NSE_CM_security_21092026.csv.gz"
-    with patch("requests.Session.get", _mock_get_factory({
-        url_today: _Resp(200, _security_csv_bytes()),
-        url_yesterday: _Resp(200, _security_csv_bytes()),
-    })):
+    with patch(
+        "requests.Session.get",
+        _mock_get_factory(
+            {
+                url_today: _Resp(200, _security_csv_bytes()),
+                url_yesterday: _Resp(200, _security_csv_bytes()),
+            }
+        ),
+    ):
         result = discover_report(max_lookback_days=5, today=today)
     assert result.found_url == url_today  # today's own date wins, not yesterday's
 
@@ -122,6 +133,7 @@ def test_discover_treats_network_exception_as_unreachable_not_not_found():
         if url == "https://www.nseindia.com":
             return _Resp(200)
         import requests
+
         raise requests.Timeout("simulated timeout")
 
     with patch("requests.Session.get", _get):
@@ -161,6 +173,7 @@ def test_undated_template_tried_only_once_across_the_date_window():
 
 # --- resolve_download / DataProviderError with full attempt log ---------------------------------
 
+
 def test_resolve_download_returns_the_found_url():
     result = DiscoveryResult(found_url="https://example.com/f.csv.gz", attempts=[])
     assert resolve_download(result) == "https://example.com/f.csv.gz"
@@ -174,10 +187,11 @@ def test_resolve_download_raises_with_full_attempt_log_on_failure():
         resolve_download(discovery)
     msg = str(exc_info.value)
     assert "NSE_CM_security" in msg  # the actual attempted URLs are in the error, not just a count
-    assert msg.count("->") >= 2      # multiple distinct attempts logged, not collapsed to one
+    assert msg.count("->") >= 2  # multiple distinct attempts logged, not collapsed to one
 
 
 # --- download_raw / hash_raw / validate_artifact -------------------------------------------------
+
 
 def test_download_raw_returns_full_content():
     url = "https://nsearchives.nseindia.com/content/cm/NSE_CM_security_22092026.csv.gz"
@@ -196,6 +210,7 @@ def test_download_raw_raises_on_http_error():
 
 def test_hash_raw_is_a_real_sha256():
     import hashlib
+
     content = b"hello world"
     assert hash_raw(content) == hashlib.sha256(content).hexdigest()
 
@@ -220,6 +235,7 @@ def test_validate_artifact_rejects_non_gzip_bytes_for_gz_url():
 
 
 # --- fetch_security_file: full orchestration -----------------------------------------------------
+
 
 def test_fetch_security_file_end_to_end_records_correct_hash_and_url():
     today = date(2026, 9, 22)
@@ -268,8 +284,11 @@ def test_fetch_security_file_derives_mainboard_and_snapshot_with_full_provenance
 def test_snapshot_marks_invalid_when_mainboard_is_empty():
     empty = pd.DataFrame({"NSE_Symbol": [], "Company_Name": [], "Series": []})
     result = nse_reports.SecurityFileResult(
-        frame=empty, source_url="https://example.com/f.csv.gz",
-        retrieved_at=pd.Timestamp("2026-09-22", tz="UTC"), file_hash="deadbeef", row_count=0,
+        frame=empty,
+        source_url="https://example.com/f.csv.gz",
+        retrieved_at=pd.Timestamp("2026-09-22", tz="UTC"),
+        file_hash="deadbeef",
+        row_count=0,
     )
     snap = nse_reports.snapshot(result, empty)
     assert snap.validation_status == "INVALID"

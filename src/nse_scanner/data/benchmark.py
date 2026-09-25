@@ -82,8 +82,7 @@ class YahooBenchmarkProvider(BenchmarkProvider):
     # only caller that sets this, to session.expected_completed_session.
     as_of_date: date | None = None
 
-    def fetch_benchmark(self, ticker: str, period: str, interval: str
-                         ) -> tuple[pd.DataFrame | None, str | None]:
+    def fetch_benchmark(self, ticker: str, period: str, interval: str) -> tuple[pd.DataFrame | None, str | None]:
         try:
             import yfinance as yf
         except ImportError as e:
@@ -96,7 +95,7 @@ class YahooBenchmarkProvider(BenchmarkProvider):
             repair=self.cfg.yfinance_repair,
             keepna=self.cfg.yfinance_keepna,
             group_by=self.cfg.yfinance_group_by,
-            threads=False,       # single symbol: no benefit to threading, keeps this path simple
+            threads=False,  # single symbol: no benefit to threading, keeps this path simple
             progress=False,
         )
         if self.as_of_date is not None:
@@ -132,11 +131,17 @@ class YahooBenchmarkProvider(BenchmarkProvider):
                 logger.warning(
                     "Benchmark %s: dropped %d row(s) after as_of=%s that the request layer "
                     "should not have returned (response-layer cutoff caught it)",
-                    ticker, dropped, self.as_of_date,
+                    ticker,
+                    dropped,
+                    self.as_of_date,
                 )
             if df.empty:
                 return None, f"no benchmark history on or before as_of={self.as_of_date}"
 
-        logger.info("Benchmark %s: %d rows retrieved%s", ticker, len(df),
-                    f" (as_of={self.as_of_date})" if self.as_of_date is not None else "")
+        logger.info(
+            "Benchmark %s: %d rows retrieved%s",
+            ticker,
+            len(df),
+            f" (as_of={self.as_of_date})" if self.as_of_date is not None else "",
+        )
         return df, None

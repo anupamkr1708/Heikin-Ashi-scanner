@@ -29,18 +29,23 @@ from nse_scanner.strategy.breakout import FRESH_BREAKOUT, calculate_breakout_sta
 
 @dataclass(frozen=True)
 class EventExtractionResult:
-    all_signal_days: pd.DataFrame       # every row with mandatory_pass == True
-    independent_events: pd.DataFrame    # de-correlated subset
+    all_signal_days: pd.DataFrame  # every row with mandatory_pass == True
+    independent_events: pd.DataFrame  # de-correlated subset
 
 
-def extract_signal_days(feature_df: pd.DataFrame, max_bb_overshoot_pct: float = 4.0,
-                         min_ha_body_pct: float = 1.0) -> pd.DataFrame:
+def extract_signal_days(
+    feature_df: pd.DataFrame, max_bb_overshoot_pct: float = 4.0, min_ha_body_pct: float = 1.0
+) -> pd.DataFrame:
     """`feature_df` must already contain Close, BB_Upper, BB_Overshoot_Pct, HA_Body_Pct (and
     ideally Breakout_Type — computed here if absent). Returns all rows where the mandatory
     baseline condition holds, tagged with Breakout_Type."""
     mand = evaluate_mandatory_vectorized(
-        feature_df["Close"], feature_df["BB_Upper"], feature_df["BB_Overshoot_Pct"],
-        feature_df["HA_Body_Pct"], max_bb_overshoot_pct, min_ha_body_pct,
+        feature_df["Close"],
+        feature_df["BB_Upper"],
+        feature_df["BB_Overshoot_Pct"],
+        feature_df["HA_Body_Pct"],
+        max_bb_overshoot_pct,
+        min_ha_body_pct,
     )
     df = feature_df.copy()
     df["mandatory_pass"] = mand["mandatory_pass"]
@@ -95,8 +100,12 @@ def extract_independent_events(signal_days: pd.DataFrame, cooldown_days: int = 5
     return df.loc[df.index.isin(selected_index_values)].copy()
 
 
-def extract_events(feature_df_by_symbol: dict[str, pd.DataFrame], max_bb_overshoot_pct: float = 4.0,
-                    min_ha_body_pct: float = 1.0, cooldown_days: int = 5) -> EventExtractionResult:
+def extract_events(
+    feature_df_by_symbol: dict[str, pd.DataFrame],
+    max_bb_overshoot_pct: float = 4.0,
+    min_ha_body_pct: float = 1.0,
+    cooldown_days: int = 5,
+) -> EventExtractionResult:
     """Convenience wrapper over multiple securities' feature frames."""
     all_frames = []
     for symbol, fdf in feature_df_by_symbol.items():

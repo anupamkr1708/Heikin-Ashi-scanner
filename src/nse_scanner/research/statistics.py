@@ -31,15 +31,27 @@ class DescriptiveStats:
     expectancy: float | None
 
 
-def describe_returns(returns_pct: np.ndarray, symbols: np.ndarray | None = None,
-                      dates: np.ndarray | None = None) -> DescriptiveStats:
+def describe_returns(
+    returns_pct: np.ndarray, symbols: np.ndarray | None = None, dates: np.ndarray | None = None
+) -> DescriptiveStats:
     r = np.asarray(returns_pct, dtype=float)
     r = r[~np.isnan(r)]
     n = r.size
     if n == 0:
         return DescriptiveStats(
-            n=0, unique_stocks=0, unique_days=0, mean=None, median=None, std=None, win_rate=None,
-            average_win=None, average_loss=None, best=None, worst=None, profit_factor=None, expectancy=None,
+            n=0,
+            unique_stocks=0,
+            unique_days=0,
+            mean=None,
+            median=None,
+            std=None,
+            win_rate=None,
+            average_win=None,
+            average_loss=None,
+            best=None,
+            worst=None,
+            profit_factor=None,
+            expectancy=None,
         )
 
     wins = r[r > 0]
@@ -56,16 +68,27 @@ def describe_returns(returns_pct: np.ndarray, symbols: np.ndarray | None = None,
         n=n,
         unique_stocks=int(len(set(symbols))) if symbols is not None else n,
         unique_days=int(len(set(dates))) if dates is not None else n,
-        mean=float(r.mean()), median=float(np.median(r)), std=float(r.std(ddof=1)) if n > 1 else 0.0,
-        win_rate=win_rate, average_win=avg_win, average_loss=avg_loss,
-        best=float(r.max()), worst=float(r.min()),
-        profit_factor=profit_factor, expectancy=expectancy,
+        mean=float(r.mean()),
+        median=float(np.median(r)),
+        std=float(r.std(ddof=1)) if n > 1 else 0.0,
+        win_rate=win_rate,
+        average_win=avg_win,
+        average_loss=avg_loss,
+        best=float(r.max()),
+        worst=float(r.min()),
+        profit_factor=profit_factor,
+        expectancy=expectancy,
     )
 
 
-def bootstrap_ci_clustered(returns_pct: np.ndarray, cluster_ids: np.ndarray, n_boot: int = 2000,
-                            ci: float = 0.90, statistic: str = "mean", random_state: int = 42
-                            ) -> tuple[float, float]:
+def bootstrap_ci_clustered(
+    returns_pct: np.ndarray,
+    cluster_ids: np.ndarray,
+    n_boot: int = 2000,
+    ci: float = 0.90,
+    statistic: str = "mean",
+    random_state: int = 42,
+) -> tuple[float, float]:
     """Block/cluster bootstrap: resample cluster IDs with replacement, take all observations in
     the resampled clusters, compute the statistic. Returns (lower, upper) at the given CI level.
     Use once with cluster_ids = day, once with cluster_ids = stock (PART 48 — both matter and
@@ -107,8 +130,7 @@ def cluster_summary(symbols: np.ndarray, dates: np.ndarray) -> dict[str, float]:
     how concentrated the sample is before quoting a confidence interval."""
     n = len(symbols)
     if n == 0:
-        return {"n": 0, "unique_stocks": 0, "unique_days": 0,
-                "avg_signals_per_day": 0.0, "avg_signals_per_stock": 0.0}
+        return {"n": 0, "unique_stocks": 0, "unique_days": 0, "avg_signals_per_day": 0.0, "avg_signals_per_stock": 0.0}
     unique_stocks = len(set(symbols))
     unique_days = len(set(dates))
     return {
@@ -133,9 +155,15 @@ def sector_summary(sectors: np.ndarray, returns_pct: np.ndarray) -> pd.DataFrame
     df = pd.DataFrame({"Sector": sectors_clean, "Return_Pct": returns_pct})
     total_n = len(df)
 
-    grouped = df.groupby("Sector")["Return_Pct"].agg(
-        N="count", Mean_Return_Pct="mean", Median_Return_Pct="median",
-    ).reset_index()
+    grouped = (
+        df.groupby("Sector")["Return_Pct"]
+        .agg(
+            N="count",
+            Mean_Return_Pct="mean",
+            Median_Return_Pct="median",
+        )
+        .reset_index()
+    )
     grouped["Pct_Of_Total_Signals"] = (grouped["N"] / total_n * 100.0) if total_n else 0.0
     grouped = grouped.sort_values("N", ascending=False).reset_index(drop=True)
     return grouped

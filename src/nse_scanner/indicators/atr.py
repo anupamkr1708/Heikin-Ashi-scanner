@@ -30,11 +30,14 @@ def true_range(df: pd.DataFrame) -> pd.Series:
     seed only uses TR values computed WITH a genuine previous close.
     """
     prev_close = df["Close"].shift(1)
-    tr = pd.concat([
-        df["High"] - df["Low"],
-        (df["High"] - prev_close).abs(),
-        (df["Low"] - prev_close).abs(),
-    ], axis=1).max(axis=1)
+    tr = pd.concat(
+        [
+            df["High"] - df["Low"],
+            (df["High"] - prev_close).abs(),
+            (df["Low"] - prev_close).abs(),
+        ],
+        axis=1,
+    ).max(axis=1)
     tr.name = "TR"
     return tr
 
@@ -58,9 +61,9 @@ def wilder_atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
     # (the standard convention) rather than NaN — but the Wilder seed window deliberately still
     # starts at index 1, using exactly `period` TRUE RANGE values computed WITH a prior close
     # (tr_vals[1:period+1]), which is the conventional Wilder seed definition.
-    seed = np.nanmean(tr_vals[1:period + 1])
+    seed = np.nanmean(tr_vals[1 : period + 1])
     atr[period] = seed  # seed lands on the bar AFTER the period-th TR value, matching a
-                          # `period`-bar warm-up plus the first TR (which itself needs a prior close)
+    # `period`-bar warm-up plus the first TR (which itself needs a prior close)
 
     prev = seed
     for t in range(period + 1, n):

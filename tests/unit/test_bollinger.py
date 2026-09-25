@@ -57,4 +57,3 @@ def test_overshoot_formula_exact():
     upper = pd.Series([100.0])
     result = bb_overshoot_pct(close, upper)
     assert result.iloc[0] == pytest.approx(4.0)
-

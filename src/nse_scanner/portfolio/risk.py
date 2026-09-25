@@ -16,12 +16,17 @@ class PositionSizeResult:
     shares: int
     risk_capital: float
     position_value: float
-    capped_by: str | None   # None | "min_position_size" | "max_position_size" | "liquidity"
+    capped_by: str | None  # None | "min_position_size" | "max_position_size" | "liquidity"
 
 
-def calculate_position_size(capital: float, entry_price: float, stop_price: float, cfg: RiskConfig,
-                             avg_daily_dollar_volume: float | None = None,
-                             max_pct_of_adv: float = 0.05) -> PositionSizeResult:
+def calculate_position_size(
+    capital: float,
+    entry_price: float,
+    stop_price: float,
+    cfg: RiskConfig,
+    avg_daily_dollar_volume: float | None = None,
+    max_pct_of_adv: float = 0.05,
+) -> PositionSizeResult:
     if entry_price <= stop_price:
         raise ValueError("entry_price must be > stop_price for a long position")
 
@@ -46,5 +51,8 @@ def calculate_position_size(capital: float, entry_price: float, stop_price: floa
         shares = 0  # cannot meet minimum size within the risk budget — do not silently round up
 
     return PositionSizeResult(
-        shares=shares, risk_capital=risk_capital, position_value=shares * entry_price, capped_by=capped_by,
+        shares=shares,
+        risk_capital=risk_capital,
+        position_value=shares * entry_price,
+        capped_by=capped_by,
     )

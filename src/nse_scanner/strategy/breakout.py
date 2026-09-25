@@ -29,8 +29,7 @@ EXT_EXTENDED = "EXTENDED"
 EXT_EXCESSIVE = "EXCESSIVE"
 
 
-def calculate_breakout_state(close: pd.Series, upper: pd.Series,
-                              max_bb_overshoot_pct: float = 4.0) -> pd.DataFrame:
+def calculate_breakout_state(close: pd.Series, upper: pd.Series, max_bb_overshoot_pct: float = 4.0) -> pd.DataFrame:
     bo = pd.DataFrame(index=close.index)
 
     is_above = close > upper
@@ -48,9 +47,7 @@ def calculate_breakout_state(close: pd.Series, upper: pd.Series,
 
     # Consecutive days above the upper band, ending at each row.
     streak_id = (~is_above).cumsum()
-    bo["Days_Above_Upper_BB"] = (
-        is_above.groupby(streak_id).cumsum().where(is_above, 0).astype(int)
-    )
+    bo["Days_Above_Upper_BB"] = is_above.groupby(streak_id).cumsum().where(is_above, 0).astype(int)
 
     overshoot_pct = (close - upper) / upper * 100.0
     ext_conditions = [

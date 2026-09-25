@@ -26,8 +26,9 @@ class WalkForwardWindow:
     test_end: date
 
 
-def generate_walk_forward_windows(data_start: date, data_end: date, train_years: float = 3.0,
-                                   test_months: float = 6.0) -> list[WalkForwardWindow]:
+def generate_walk_forward_windows(
+    data_start: date, data_end: date, train_years: float = 3.0, test_months: float = 6.0
+) -> list[WalkForwardWindow]:
     """Rolls a fixed-length train window forward by `test_months` each step, with the test window
     immediately following the train window. Stops once the test window would run past `data_end`.
     """
