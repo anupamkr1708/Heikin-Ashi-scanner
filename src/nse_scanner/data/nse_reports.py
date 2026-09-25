@@ -172,6 +172,14 @@ class DiscoveryAttempt:
 class DiscoveryResult:
     found_url: str | None
     attempts: list[DiscoveryAttempt] = field(default_factory=list)
+    # Provenance fix (P1 forensic finding, Part 2): the report/effective date embedded in
+    # `found_url`'s dated-template substitution (e.g. NSE_CM_security_23092026.csv.gz -> date(2026,
+    # 9, 23)) — captured here, at the one point this module already knows it from constructing the
+    # candidate URL, rather than re-parsed out of the URL string afterward. None means either
+    # discovery failed (found_url is also None) or found_url came from an UNDATED template
+    # (SecurityFileUrlTemplate.dated=False, e.g. the EQUITY_L.csv fallback) — there is genuinely no
+    # date to attribute in that case, and this module never guesses one from retrieval time.
+    source_date: date | None = None
 
     @property
     def summary(self) -> str:
@@ -244,7 +252,11 @@ def discover_report(max_lookback_days: int = 10, timeout: int = 15, today: date 
                 continue
 
             attempts.append(DiscoveryAttempt(url, "AVAILABLE"))
-            return DiscoveryResult(found_url=url, attempts=attempts)
+            return DiscoveryResult(
+                found_url=url,
+                attempts=attempts,
+                source_date=candidate_date if tpl.dated else None,
+            )
 
     return DiscoveryResult(found_url=None, attempts=attempts)
 
@@ -320,6 +332,12 @@ class SecurityFileResult:
     file_hash: str
     row_count: int
     discovery_attempts: list[DiscoveryAttempt] = field(default_factory=list)
+    # Provenance fix (P1 forensic finding, Part 2) — see DiscoveryResult.source_date docstring.
+    # Deliberately separate from `retrieved_at`: the source file's own report/effective date is a
+    # different concept from when THIS process happened to download it, and the two can legitimately
+    # differ (a file dated 2026-09-23 retrieved on 2026-09-24). Default None keeps this field
+    # optional for any pre-existing direct construction (e.g. tests) that predates this field.
+    source_date: date | None = None
 
 
 def fetch_security_file(
@@ -350,6 +368,7 @@ def fetch_security_file(
         file_hash=file_hash,
         row_count=len(frame),
         discovery_attempts=discovery.attempts,
+        source_date=discovery.source_date,
     )
 
 
@@ -409,10 +428,28 @@ def snapshot(result: SecurityFileResult, mainboard_df: pd.DataFrame) -> Universe
     (source URL, file hash, schema version, raw vs eligible counts) — the same record type
     `universe/validation.py::build_snapshot` produces for NIFTY_200, reused here rather than
     inventing a parallel type."""
+    # Provenance fix (P1 forensic finding, Part 2): `snapshot_date` must be the security FILE's
+    # own report/effective date (e.g. NSE_CM_security_23092026.csv.gz -> 2026-09-23), never the
+    # retrieval timestamp (result.retrieved_at) -- those are separate concepts that can legitimately
+    # disagree (a file dated 2026-09-23 retrieved on 2026-09-24). `retrieved_at` remains recorded
+    # separately on the UniverseSnapshot/SecurityFileResult and is never overwritten here.
+    # Fail safely rather than silently substituting retrieved_at when no source date could
+    # honestly be attributed (e.g. discovery fell back to an undated URL template) -- this is the
+    # exact "malformed/unparseable source date" case this fix must not paper over.
+    if result.source_date is None:
+        raise DataProviderError(
+            "Cannot build a NSE_MAINBOARD_EQ UniverseSnapshot without a source/report date: "
+            f"the discovered security-file URL ({result.source_url!r}) does not embed a "
+            "parseable report date (discovery matched an undated fallback template). Refusing "
+            "to substitute the retrieval timestamp as if it were the source date -- that is "
+            "exactly the provenance bug this check exists to prevent. Re-run discovery, or "
+            "extend SECURITY_FILE_URL_TEMPLATES so the winning template carries a real date."
+        )
+
     has_symbol = "NSE_Symbol" in mainboard_df.columns
     return UniverseSnapshot(
         universe_id="NSE_MAINBOARD_EQ",
-        snapshot_date=result.retrieved_at.date(),
+        snapshot_date=result.source_date,
         source=result.source_url,
         source_version=None,
         retrieved_at=result.retrieved_at,

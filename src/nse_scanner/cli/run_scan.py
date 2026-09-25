@@ -67,7 +67,11 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     data_provider = NSEDataProvider(store=store)
-    benchmark_provider = YahooBenchmarkProvider(cfg.data)
+    # AS-OF binding (research-integrity fix, mirrors run_daily.py): bind to
+    # session.expected_completed_session so this non-replay entry point cannot pull a same-day/
+    # in-progress benchmark row either. Reuses the existing provider-level as_of_date mechanism —
+    # no new cutoff logic introduced here.
+    benchmark_provider = YahooBenchmarkProvider(cfg.data, as_of_date=session.expected_completed_session)
 
     try:
         result = run_scan_pipeline(

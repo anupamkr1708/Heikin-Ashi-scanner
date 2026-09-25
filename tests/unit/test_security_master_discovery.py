@@ -289,6 +289,7 @@ def test_snapshot_marks_invalid_when_mainboard_is_empty():
         retrieved_at=pd.Timestamp("2026-09-22", tz="UTC"),
         file_hash="deadbeef",
         row_count=0,
+        source_date=date(2026, 9, 22),
     )
     snap = nse_reports.snapshot(result, empty)
     assert snap.validation_status == "INVALID"

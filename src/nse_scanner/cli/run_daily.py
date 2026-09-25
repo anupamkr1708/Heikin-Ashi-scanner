@@ -142,7 +142,14 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     data_provider = NSEDataProvider(store=store)
-    benchmark_provider = YahooBenchmarkProvider(cfg.data)
+    # AS-OF binding (research-integrity fix): without this, the provider defaults to
+    # as_of_date=None and fetches an unbounded, rolling `period=` window from yfinance — which can
+    # include a same-day/in-progress index row (e.g. a 2026-09-24 ^NSEI row while the session this
+    # run is actually scoring is 2026-09-23). Binding explicitly to the same
+    # `session.expected_completed_session` that `run_replay.py` already uses activates the
+    # provider's existing request+response-layer cutoff (see data/benchmark.py) for the daily path
+    # too. No new mechanism — this reuses what run_replay.py already relies on.
+    benchmark_provider = YahooBenchmarkProvider(cfg.data, as_of_date=session.expected_completed_session)
 
     try:
         result = run_scan(
