@@ -35,6 +35,13 @@ class UniverseSnapshot:
     # for this pipeline; kept as its own named field since the
     # distinction from raw_row_count is the point of recording it)
     definition: str | None = None  # human-readable universe-membership rule, e.g. "Series in {EQ,BE}"
+    # mainboard-universe-semantics addition — optional, default None so every existing caller
+    # (build_snapshot below, and nse_reports.snapshot() call sites that don't pass it) is
+    # unaffected. Cardinality-funnel + explainability diagnostics (see
+    # data/nse_reports.py::compute_mainboard_diagnostics); never used for filtering, only for
+    # making "why is this row in/out" and "how did we get from N raw rows to M constituents"
+    # answerable from the manifest without re-deriving them.
+    diagnostics: dict | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -54,6 +61,7 @@ class UniverseSnapshot:
             "raw_row_count": self.raw_row_count,
             "eligible_count": self.eligible_count,
             "definition": self.definition,
+            "diagnostics": self.diagnostics,
         }
 
 

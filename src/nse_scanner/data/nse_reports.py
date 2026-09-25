@@ -421,8 +421,108 @@ def filter_mainboard_equity(security_df: pd.DataFrame) -> pd.DataFrame:
 
 derive_mainboard = filter_mainboard_equity  # pipeline-stage alias, see docstring above
 
+# Diagnostic-only fields (Part D/E of the mainboard-universe-semantics forensic audit): present in
+# the real CM-MII file but NOT in SECURITY_FILE_COLUMN_CANDIDATES, so parse_security_file leaves
+# them under their raw header names rather than canonicalizing them. Their exact value semantics
+# remain UNRESOLVED (see DAILY_ASOF_PROVENANCE_HARDENING_NOTES.md / the mainboard-universe-semantics
+# forensic report) -- they are surfaced here for VISIBILITY ONLY (diagnostics), never for filtering.
+# Do not add a field here and start filtering on it without first updating that report's evidence
+# matrix from UNKNOWN/INFERENCE to CONFIRMED against an authoritative NSE source.
+MAINBOARD_DIAGNOSTIC_FIELDS: tuple[str, ...] = (
+    "DelFlg",
+    "PrtdToTrad",
+    "ElgbltyNrmlMkt",
+    "SctyStsNrmlMkt",
+    "FinInstrmId",
+    "FinInstrmTp",
+)
 
-def snapshot(result: SecurityFileResult, mainboard_df: pd.DataFrame) -> UniverseSnapshot:
+# Deterministic EQ/BE identity preference for deduplication, NOT a change to which symbols are
+# included. Evidence: (1) NSE's own "Legend of Series" and multiple real GSM/surveillance
+# circulars confirm BE is a trade-to-trade reclassification of an EXISTING EQ-listed company, not
+# a distinct security (see forensic report, "EQ vs BE"); (2) an independently-found real-world NSE
+# bhavcopy integration (unrelated project, found via web research, not this codebase) encodes the
+# identical convention explicitly as `series EQ > BE > BZ` when deduplicating one bar per ticker.
+# Before this constant existed, `universe/mainboard.py` deduplicated by NSE_Symbol via
+# `drop_duplicates()` with no preceding sort -- an undocumented, file-row-order-dependent tie-break.
+MAINBOARD_SERIES_DEDUP_PREFERENCE: tuple[str, ...] = ("EQ", "BE")
+
+
+def deduplicate_mainboard(
+    mainboard_df: pd.DataFrame,
+    series_preference: tuple[str, ...] = MAINBOARD_SERIES_DEDUP_PREFERENCE,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Deterministically resolves one row per NSE_Symbol when a symbol has more than one row
+    (typically an EQ row and a BE row for the same company -- see MAINBOARD_SERIES_DEDUP_PREFERENCE
+    for why EQ wins). Returns (kept_df, dropped_df); `dropped_df` carries a `Dedup_Reason` and
+    `Kept_Series` column so every drop is explainable (Part 10), never silent.
+
+    Order-independent: sorts by series preference (then original position as a final, documented
+    tie-break for two rows of the SAME series for the same symbol -- a data-quality condition this
+    function surfaces via `dropped_df`, not one it silently resolves as if it were the normal
+    EQ/BE case) before dropping, so the result does not depend on the input file's row order.
+    """
+    if "NSE_Symbol" not in mainboard_df.columns:
+        return mainboard_df.copy(), mainboard_df.iloc[0:0].copy()
+
+    ranked = mainboard_df.copy()
+    ranked["_dedup_rank"] = ranked["Series"].map(
+        lambda s: series_preference.index(s) if s in series_preference else len(series_preference)
+    )
+    ranked["_orig_order"] = range(len(ranked))
+    ranked = ranked.sort_values(["NSE_Symbol", "_dedup_rank", "_orig_order"], kind="stable")
+
+    is_dup = ranked.duplicated(subset="NSE_Symbol", keep="first")
+    kept = ranked[~is_dup].drop(columns=["_dedup_rank", "_orig_order"]).reset_index(drop=True)
+    dropped = ranked[is_dup].drop(columns=["_dedup_rank", "_orig_order"]).reset_index(drop=True)
+    if len(dropped):
+        kept_series_by_symbol = kept.set_index("NSE_Symbol")["Series"]
+        dropped["Kept_Series"] = dropped["NSE_Symbol"].map(kept_series_by_symbol)
+        dropped["Dedup_Reason"] = dropped.apply(
+            lambda r: "SERIES_PREFERENCE_EQ_OVER_BE"
+            if {r["Series"], r["Kept_Series"]} == {"EQ", "BE"}
+            else "DUPLICATE_ROW_SAME_SERIES_ROW_ORDER_TIEBREAK",  # flags a data-quality condition,
+            # not the normal EQ/BE case -- worth a human look if this ever fires on a real file.
+            axis=1,
+        )
+    return kept, dropped
+
+
+def compute_mainboard_diagnostics(
+    security_df: pd.DataFrame,
+    mainboard_df: pd.DataFrame,
+    deduped_df: pd.DataFrame,
+    dropped_df: pd.DataFrame,
+    excluded_df: pd.DataFrame | None = None,
+) -> dict:
+    """Cardinality funnel + explainability diagnostics for NSE_MAINBOARD_EQ (Part 11 of the
+    mainboard-universe-semantics forensic audit): raw rows -> per-series breakdown -> EQ/BE rows
+    -> known-non-equity-excluded -> deduplicated -> final count, plus which of the still-unresolved
+    MAINBOARD_DIAGNOSTIC_FIELDS are even present in this particular file (their absence/presence
+    can legitimately differ across NSE file revisions). This function filters nothing; it only
+    describes what filter_mainboard_equity/deduplicate_mainboard already did.
+    """
+    excluded_df = excluded_df if excluded_df is not None else mainboard_df.iloc[0:0]
+    series_counts = security_df["Series"].value_counts().to_dict() if "Series" in security_df.columns else {}
+    return {
+        "raw_row_count": len(security_df),
+        "series_breakdown": series_counts,
+        "eq_be_row_count": len(mainboard_df),  # output of filter_mainboard_equity, unchanged
+        "excluded_known_non_equity_count": len(excluded_df),
+        "deduplicated_row_count": len(deduped_df),
+        "dropped_by_dedup_count": len(dropped_df),
+        "dedup_reasons": (dropped_df["Dedup_Reason"].value_counts().to_dict() if len(dropped_df) else {}),
+        "final_constituent_count": len(deduped_df),
+        # Presence, not values: whether this specific file even carries each still-unresolved
+        # field. A field being absent here is itself diagnostic (schema drift / different NSE
+        # file revision) and worth surfacing even though none of these fields are filtered on.
+        "diagnostic_field_presence": {field: (field in security_df.columns) for field in MAINBOARD_DIAGNOSTIC_FIELDS},
+    }
+
+
+def snapshot(
+    result: SecurityFileResult, mainboard_df: pd.DataFrame, diagnostics: dict | None = None
+) -> UniverseSnapshot:
     """The pipeline's final `snapshot` stage: turns a successful `fetch_security_file` result plus
     its EQ/BE-filtered mainboard frame into a `UniverseSnapshot` record carrying full provenance
     (source URL, file hash, schema version, raw vs eligible counts) — the same record type
@@ -464,4 +564,5 @@ def snapshot(result: SecurityFileResult, mainboard_df: pd.DataFrame) -> Universe
         raw_row_count=result.row_count,
         eligible_count=len(mainboard_df),
         definition="NSE_MAINBOARD_EQ = CM-MII security file rows with Series in {EQ, BE}",
+        diagnostics=diagnostics,
     )

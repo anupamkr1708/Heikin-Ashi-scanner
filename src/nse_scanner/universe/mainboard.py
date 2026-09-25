@@ -10,12 +10,17 @@ substitute a smaller/stale list.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pandas as pd
 
 from nse_scanner.data.base import UniverseProvider
-from nse_scanner.data.nse_reports import fetch_security_file, filter_mainboard_equity
+from nse_scanner.data.nse_reports import (
+    compute_mainboard_diagnostics,
+    deduplicate_mainboard,
+    fetch_security_file,
+    filter_mainboard_equity,
+)
 from nse_scanner.exceptions import DataProviderError, UniverseIntegrityError
 from nse_scanner.logging_config import get_logger
 
@@ -26,6 +31,19 @@ logger = get_logger(__name__)
 class NSEMainboardEquityUniverseProvider(UniverseProvider):
     min_count: int = 500  # sanity bounds — NSE mainboard equity count is in the low thousands
     max_count: int = 4000
+    # Mainboard-universe-semantics addition: an explicit, OPT-IN cross-reference of symbols/ISINs
+    # to exclude from NSE_MAINBOARD_EQ despite having Series in {EQ, BE} — intended for a future
+    # authoritative ETF/REIT/InvIT list (candidate mechanism identified during forensic research:
+    # NSE separately publishes an ETF security list, e.g. eq_etfseclist.csv, cross-referenced by
+    # symbol/ISIN against the security master — NOT a field inside the security master itself).
+    # Deliberately EMPTY by default: no authoritative list has been fetched/verified yet, so today's
+    # universe composition is byte-identical to before this field existed. Do not populate this
+    # from a symbol-name heuristic (e.g. "ends with ETF") — see the forensic report's explicit
+    # instruction against that. See test_mainboard_known_non_equity_exclusion.py for how this
+    # activates once a real list is wired in.
+    excluded_symbols: frozenset[str] = field(default_factory=frozenset)
+    excluded_isins: frozenset[str] = field(default_factory=frozenset)
+    last_diagnostics: dict | None = field(default=None, init=False, repr=False, compare=False)
 
     def get_constituents(self) -> tuple[pd.DataFrame, str, str]:
         try:
@@ -38,7 +56,35 @@ class NSEMainboardEquityUniverseProvider(UniverseProvider):
             ) from e
 
         mainboard = filter_mainboard_equity(result.frame)
-        mainboard = mainboard.drop_duplicates(subset="NSE_Symbol").reset_index(drop=True)
+        eq_be_filtered = mainboard.copy()  # kept for diagnostics — pre-exclusion, pre-dedup
+
+        excluded_mask = pd.Series(False, index=mainboard.index)
+        if self.excluded_symbols:
+            excluded_mask |= mainboard["NSE_Symbol"].isin(self.excluded_symbols)
+        if self.excluded_isins and "ISIN" in mainboard.columns:
+            excluded_mask |= mainboard["ISIN"].isin(self.excluded_isins)
+        excluded = mainboard[excluded_mask].copy()
+        mainboard = mainboard[~excluded_mask].copy()
+
+        mainboard, dropped_by_dedup = deduplicate_mainboard(mainboard)
+        mainboard = mainboard.reset_index(drop=True)
+
+        self.last_diagnostics = compute_mainboard_diagnostics(
+            result.frame,
+            eq_be_filtered,
+            mainboard,
+            dropped_by_dedup,
+            excluded_df=excluded,
+        )
+        logger.info(
+            "NSE_MAINBOARD_EQ diagnostics: raw=%d eq_be=%d excluded_known_non_equity=%d "
+            "dropped_by_dedup=%d final=%d",
+            self.last_diagnostics["raw_row_count"],
+            self.last_diagnostics["eq_be_row_count"],
+            self.last_diagnostics["excluded_known_non_equity_count"],
+            self.last_diagnostics["dropped_by_dedup_count"],
+            self.last_diagnostics["final_constituent_count"],
+        )
 
         if not (self.min_count <= len(mainboard) <= self.max_count):
             raise UniverseIntegrityError(
