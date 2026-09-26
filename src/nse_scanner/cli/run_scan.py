@@ -23,6 +23,7 @@ from nse_scanner.logging_config import configure_logging
 from nse_scanner.pipeline.scan import run_scan as run_scan_pipeline
 from nse_scanner.reporting.excel import write_report
 from nse_scanner.reporting.run_manifest import build_run_manifest
+from nse_scanner.reporting.summary import build_summary_sheet
 from nse_scanner.universe.factory import get_universe_provider
 
 IST = zoneinfo.ZoneInfo("Asia/Kolkata")
@@ -87,8 +88,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"SCAN FAILED: {type(e).__name__}: {e}", file=sys.stderr)
         return 1
 
-    report_path = Path(cfg.paths.reports_dir) / f"NSE_Technical_Scanner_{session.signal_date.isoformat()}.xlsx"
-    write_report(result.sheets, report_path)
+    # Manifest is built BEFORE the Excel report now (Task 5): EOD_Summary needs the manifest's
+    # git_commit/software_version, and both sheet and manifest must report the exact same values
+    # for the exact same run — building the manifest first and reading it back (rather than
+    # deriving a second, possibly-different copy of those fields) makes that structurally true
+    # rather than just conventionally true.
     manifest = build_run_manifest(
         run_id=result.run_id,
         cfg=cfg,
@@ -115,6 +119,10 @@ def main(argv: list[str] | None = None) -> int:
             "needs_bootstrap": result.needs_bootstrap,
         },
     )
+
+    result.sheets.summary = build_summary_sheet(result, cfg, session, manifest)
+    report_path = Path(cfg.paths.reports_dir) / f"NSE_Technical_Scanner_{session.signal_date.isoformat()}.xlsx"
+    write_report(result.sheets, report_path)
     manifest.write(Path(cfg.paths.reports_dir) / f"run_manifest_{session.signal_date.isoformat()}.json")
 
     print(

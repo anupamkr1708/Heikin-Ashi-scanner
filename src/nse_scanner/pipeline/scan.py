@@ -57,6 +57,30 @@ HISTORY_NO_DATA = "NO_DATA"
 FAILURE_DATA_VALIDATION = "data_validation_failure"  # routine: insufficient history, bad OHLC, no data
 FAILURE_SECURITY_SCAN = "security_scan_failure"  # unexpected: sanity-gate trip or other bug
 
+# --- client-reporting-hardening: explicit per-symbol diagnostic vocabulary (Tasks 2-4) ---
+# `Failure_Category`/`Failure_Reason` above are the pre-existing coarse/free-text pair (kept
+# byte-for-byte compatible — tests/integration/test_diagnostics_and_run_health.py depends on
+# their exact values). `Primary_Strategy_Status` / `Primary_Failure_Stage` /
+# `Primary_Failure_Reason` below are new, additive, structured fields for exactly WHY a symbol
+# did or didn't produce a signal — distinct from "was there a data problem".
+STRATEGY_STATUS_EVALUATED = "EVALUATED"  # the baseline BB+HA conditions were actually checked
+STRATEGY_STATUS_NOT_EVALUABLE = "NOT_EVALUABLE"  # never reached the strategy check at all
+
+STAGE_DATA_VALIDATION = "data_validation"
+STAGE_STRATEGY_GATE = "strategy_gate"  # the immutable mandatory BB+HA condition itself
+STAGE_SANITY_GATE = "sanity_gate"
+STAGE_SCAN = "scan"
+
+REASON_NOT_EVALUABLE_NO_DATA = "NOT_EVALUABLE_NO_DATA"
+REASON_NOT_EVALUABLE_INSUFFICIENT_HISTORY = "NOT_EVALUABLE_INSUFFICIENT_HISTORY"
+REASON_DATA_VALIDATION_FAILURE = "DATA_VALIDATION_FAILURE"  # rows existed but failed OHLC quality
+# checks (bad ordering, non-positive prices, ...) for a reason OTHER than plain row-count
+REASON_CLOSE_NOT_ABOVE_UPPER_BB = "CLOSE_NOT_ABOVE_UPPER_BB"
+REASON_BB_OVERSHOOT_OUT_OF_RANGE = "BB_OVERSHOOT_OUT_OF_RANGE"
+REASON_HA_BODY_TOO_SMALL = "HA_BODY_TOO_SMALL"
+REASON_SANITY_GATE_FAILURE = "SANITY_GATE_FAILURE"
+REASON_SECURITY_SCAN_FAILURE = "SECURITY_SCAN_FAILURE"
+
 
 @dataclass
 class ScanRunResult:
@@ -79,6 +103,14 @@ class ScanRunResult:
 
 
 def _diagnostic_row(symbol: str, rec, **overrides) -> dict:
+    """Canonical Diagnostics-row shape (Task 2). EVERY successfully-processed universe member
+    gets exactly one row from this function, whatever happened to it — PASS, mandatory-condition
+    FAIL, sanity-gate failure, or NOT_EVALUABLE (no/insufficient data). Every diagnostic/feature
+    field below defaults to None; a caller overrides ONLY the fields it actually has a real,
+    already-computed value for — nothing here is ever invented or recalculated (Task 2: 'preserve
+    the exact values already used by the strategy calculation... do NOT recalculate with
+    alternative formulas'). A field left at None therefore means exactly what Task 4 asks for:
+    'this feature genuinely does not exist for this row', not a silently dropped value."""
     row = {
         "Symbol": symbol,
         "Company_Name": getattr(rec, "Company_Name", symbol),
@@ -88,17 +120,122 @@ def _diagnostic_row(symbol: str, rec, **overrides) -> dict:
         "Data_Status": DataStatus.UNAVAILABLE,
         "History_Quality": None,
         "Price_Basis": None,
+        "Signal_Date": None,
+        "Stock": None,
+        "CMP": None,
+        "BB_Middle": None,
+        "BB_Upper": None,
+        "BB_Lower": None,
+        "BB_StdDev": None,
+        "BB_Width_Pct": None,
+        "BB_PctB": None,
+        "BB_Overshoot_Pct": None,
+        "HA_Open": None,
+        "HA_Close": None,
+        "HA_Body_Pct": None,
+        "ATR14": None,
+        "ATR_Pct": None,
+        "BB_Overshoot_ATR": None,
+        "Volume": None,
+        "Volume_Ratio_20": None,
+        "Dollar_Volume": None,
+        "SMA20": None,
+        "SMA50": None,
+        "SMA200": None,
+        "SMA20_Status": None,
+        "SMA50_Status": None,
+        "SMA200_Status": None,
+        "Dist_SMA50_Pct": None,
+        "Dist_SMA200_Pct": None,
+        "RS_20D": None,
+        "RS_60D": None,
+        "RS_120D": None,
+        "Breakout_Type": None,
+        "Days_Above_Upper_BB": None,
+        "Market_Regime": None,
+        "Benchmark_Status": None,
+        "Score_Status": None,
+        "Research_Heuristic_Score": None,
         "BB_Breakout": None,
         "BB_Size_OK": None,
         "HA_Strength_OK": None,
+        "Primary_Strategy_Status": STRATEGY_STATUS_NOT_EVALUABLE,
         "Primary_Signal": False,
+        "Primary_Failure_Stage": None,
+        "Primary_Failure_Reason": None,
         "Optional_Filter_Status": None,
+        "Optional_Filters_Passed": None,
         "Failure_Category": None,
         "Failure_Reason": None,
         "Signal_Reason": None,
     }
     row.update(overrides)
     return row
+
+
+def _feature_fields(
+    symbol: str,
+    row: pd.Series,
+    last_bar_date_d,
+    benchmark_status: str,
+    score_result,
+    atr_period: int,
+) -> dict:
+    """Every field that is a direct, unmodified read of the strategy's own already-computed
+    feature row — the ONE place this happens, shared by the PASS path, the mandatory-condition
+    FAIL path, and any sanity-gate-failure path that got far enough to have a feature row at all.
+    Never recomputes anything (Task 2)."""
+    return {
+        "Signal_Date": last_bar_date_d.isoformat() if last_bar_date_d is not None else None,
+        "Stock": symbol,
+        "History_Quality": row.get("History_Quality"),
+        "CMP": row["Close"],
+        "BB_Middle": row["BB_Middle"],
+        "BB_Upper": row["BB_Upper"],
+        "BB_Lower": row["BB_Lower"],
+        "BB_StdDev": row["BB_StdDev"],
+        "BB_Width_Pct": row["BB_Width_Pct"],
+        "BB_PctB": row["BB_PctB"],
+        "BB_Overshoot_Pct": row["BB_Overshoot_Pct"],
+        "HA_Open": row["HA_Open"],
+        "HA_Close": row["HA_Close"],
+        "HA_Body_Pct": row["HA_Body_Pct"],
+        "ATR14": row.get(f"ATR{atr_period}"),
+        "ATR_Pct": row["ATR_Pct"],
+        "BB_Overshoot_ATR": row["BB_Overshoot_ATR"],
+        "Volume": row["Volume"],
+        "Volume_Ratio_20": row.get("Volume_Ratio_20"),
+        "Dollar_Volume": row.get("Dollar_Volume"),
+        "SMA20": row.get("SMA20"),
+        "SMA50": row.get("SMA50"),
+        "SMA200": row.get("SMA200"),
+        "SMA20_Status": row.get("SMA20_Status"),
+        "SMA50_Status": row.get("SMA50_Status"),
+        "SMA200_Status": row.get("SMA200_Status"),
+        "Dist_SMA50_Pct": row.get("Dist_SMA50_Pct"),
+        "Dist_SMA200_Pct": row.get("Dist_SMA200_Pct"),
+        "RS_20D": row.get("RS_20D"),
+        "RS_60D": row.get("RS_60D"),
+        "RS_120D": row.get("RS_120D"),
+        "Breakout_Type": row.get("Breakout_Type"),
+        "Days_Above_Upper_BB": row.get("Days_Above_Upper_BB"),
+        "Market_Regime": row.get("Market_Regime"),
+        "Benchmark_Status": benchmark_status,
+        "Score_Status": score_result.status if score_result is not None else None,
+        "Research_Heuristic_Score": score_result.score if score_result is not None else None,
+    }
+
+
+def _strategy_gate_failure_reason(bb_breakout: bool, bb_size_ok: bool, ha_strength_ok: bool) -> str:
+    """Priority order mirrors the mandatory AND clause itself (Close > Upper_BB, then the
+    overshoot bound, then the HA body threshold) so a row failing more than one condition at
+    once still gets ONE deterministic, meaningful primary reason (Task 3) rather than an
+    arbitrary one."""
+    if not bb_breakout:
+        return REASON_CLOSE_NOT_ABOVE_UPPER_BB
+    if not bb_size_ok:
+        return REASON_BB_OVERSHOOT_OUT_OF_RANGE
+    return REASON_HA_BODY_TOO_SMALL
 
 
 def run_scan(
@@ -163,19 +300,63 @@ def run_scan(
 
     for rec in constituents.itertuples(index=False):
         symbol = rec.Symbol
+        # Bound in the outer function scope before the try starts so that EVERY except branch
+        # below can safely reference "however far we got" (Task 4: never hide partial feature
+        # availability) instead of only being able to report a bare exception message.
+        row = None
+        prev_row = None
+        df_clean = None
+        data_status = None
+        symbol_price_basis = None
+        last_bar_date_d = None
+        bb_breakout = None
+        bb_size_ok = None
+        ha_strength_ok = None
+        filter_result = None
+        score_result = None
         try:
             df_raw, meta, err = data_provider.fetch_history(symbol, cfg.research.live_history_period, cfg.data.interval)
-            if df_raw is None:
-                raise DataValidationError(err or "no data returned")
-            symbol_price_basis = meta.price_basis if meta is not None else price_basis
-            observed_price_bases.add(symbol_price_basis)
 
             try:
+                if df_raw is None:
+                    raise DataValidationError(err or "no data returned", reason=DataValidationError.REASON_NO_DATA)
+                symbol_price_basis = meta.price_basis if meta is not None else price_basis
+                observed_price_bases.add(symbol_price_basis)
                 df_clean, val_report = validate_and_clean_ohlc(df_raw, cfg.history.min_rows_primary)
             except DataValidationError as e:
+                # Task 3: distinguish "no data at all", "rows existed but too few after
+                # cleaning" (routine, especially pre-bootstrap), and "rows existed but failed a
+                # genuine OHLC quality check" (missing columns, bad ordering, etc. — see
+                # data/validation.py) — these used to be collapsed into one binary check.
+                #
+                # Review-round-1 fix: classification is now driven by DataValidationError.reason
+                # -- a STRUCTURED category each raise site in data/validation.py sets explicitly
+                # -- rather than substring-matching str(e), which was fragile to wording changes.
+                # `rows_available == 0` is kept only as a defensive fallback for any future/
+                # third-party raiser of DataValidationError that doesn't set `reason` at all
+                # (e.g. a bare DataValidationError raised outside this codebase's control) — it
+                # is a structural measurement, not text-matching, so it doesn't reintroduce the
+                # brittleness being removed here.
                 rows_available = len(df_raw) if df_raw is not None else 0
-                history_status = HISTORY_INSUFFICIENT if rows_available > 0 else HISTORY_NO_DATA
-                insufficient_history_count += 1
+                reason = getattr(e, "reason", None)
+                if reason == DataValidationError.REASON_NO_DATA or rows_available == 0:
+                    history_status = HISTORY_NO_DATA
+                    primary_failure_reason = REASON_NOT_EVALUABLE_NO_DATA
+                elif reason == DataValidationError.REASON_INSUFFICIENT_ROWS:
+                    history_status = HISTORY_INSUFFICIENT
+                    primary_failure_reason = REASON_NOT_EVALUABLE_INSUFFICIENT_HISTORY
+                    # Review-round-1 fix: this counter must reflect ONLY the true
+                    # insufficient-history population, not every DataValidationError. A symbol
+                    # with no data at all, or one that failed a genuine OHLC quality check
+                    # (missing columns, bad ordering that drops every row), is NOT a member of
+                    # "insufficient history" and must not inflate that count -- both are still
+                    # counted in the data_validation_failures umbrella below, just not here.
+                    insufficient_history_count += 1
+                else:
+                    # reason is REASON_MISSING_COLUMNS, or None (defensive fallback) -- a genuine
+                    # data-quality problem distinct from a plain row-count shortfall.
+                    history_status = HISTORY_INSUFFICIENT
+                    primary_failure_reason = REASON_DATA_VALIDATION_FAILURE
                 data_validation_failures += 1
                 diagnostics_rows.append(
                     _diagnostic_row(
@@ -183,6 +364,8 @@ def run_scan(
                         rec,
                         Rows=rows_available,
                         History_Status=history_status,
+                        Primary_Failure_Stage=STAGE_DATA_VALIDATION,
+                        Primary_Failure_Reason=primary_failure_reason,
                         Failure_Category=FAILURE_DATA_VALIDATION,
                         Failure_Reason=str(e),
                     )
@@ -200,30 +383,45 @@ def run_scan(
             row = feat.iloc[-1]
             prev_row = feat.iloc[-2] if len(feat) >= 2 else None
 
-            check_bollinger_ordering(row["BB_Upper"], row["BB_Middle"], row["BB_Lower"])
-            check_heikin_ashi_ordering(row["HA_High"], row["HA_Low"], row["HA_Open"], row["HA_Close"])
-
             bb_breakout = bool(row["Close"] > row["BB_Upper"])
             bb_size_ok = bool(0 < row["BB_Overshoot_Pct"] <= cfg.baseline.max_bb_overshoot_pct)
             ha_strength_ok = bool(row["HA_Body_Pct"] >= cfg.baseline.min_ha_body_pct)
             mandatory_pass = bb_breakout and bb_size_ok and ha_strength_ok
 
+            # Pure, side-effect-free reads of row/prev_row — computed here (before the sanity
+            # gates below) rather than only inside the PASS branch, so (a) a sanity-gate failure
+            # still has them available for its diagnostic row, and (b) mandatory-condition FAIL
+            # rows get them too, per Task 2's explicit Diagnostics field list. This changes
+            # nothing about VALUES for any row that used to compute them (identical inputs,
+            # earlier call site) — only which rows now have them.
+            filter_result = apply_optional_filters(row, prev_row, cfg.filters)
+            score_result = calculate_research_heuristic_score(row, benchmark_available=(benchmark_status == "OK"))
+
+            check_bollinger_ordering(row["BB_Upper"], row["BB_Middle"], row["BB_Lower"])
+            check_heikin_ashi_ordering(row["HA_High"], row["HA_Low"], row["HA_Open"], row["HA_Close"])
+
             if not mandatory_pass:
-                diagnostics_rows.append(
-                    _diagnostic_row(
-                        symbol,
-                        rec,
-                        Rows=len(df_clean),
-                        History_Status=HISTORY_SUFFICIENT,
-                        Data_Status=data_status,
-                        History_Quality=row.get("History_Quality"),
-                        BB_Breakout=bb_breakout,
-                        BB_Size_OK=bb_size_ok,
-                        HA_Strength_OK=ha_strength_ok,
-                        Primary_Signal=False,
-                        Price_Basis=symbol_price_basis,
-                    )
+                full_row = _diagnostic_row(
+                    symbol,
+                    rec,
+                    Rows=len(df_clean),
+                    History_Status=HISTORY_SUFFICIENT,
+                    Data_Status=data_status,
+                    Price_Basis=symbol_price_basis,
+                    BB_Breakout=bb_breakout,
+                    BB_Size_OK=bb_size_ok,
+                    HA_Strength_OK=ha_strength_ok,
+                    Primary_Strategy_Status=STRATEGY_STATUS_EVALUATED,
+                    Primary_Signal=False,
+                    Primary_Failure_Stage=STAGE_STRATEGY_GATE,
+                    Primary_Failure_Reason=_strategy_gate_failure_reason(bb_breakout, bb_size_ok, ha_strength_ok),
+                    Optional_Filter_Status=filter_result.optional_pass,
+                    Optional_Filters_Passed=filter_result.optional_pass,
+                    **_feature_fields(
+                        symbol, row, last_bar_date_d, benchmark_status, score_result, cfg.history.atr_period
+                    ),
                 )
+                diagnostics_rows.append(full_row)
                 continue
 
             check_pass_row(
@@ -235,61 +433,25 @@ def run_scan(
                 cfg.baseline.min_ha_body_pct,
             )
 
-            filter_result = apply_optional_filters(row, prev_row, cfg.filters)
-            score_result = calculate_research_heuristic_score(row, benchmark_available=(benchmark_status == "OK"))
-
-            out_row = {
-                "Signal_Date": last_bar_date_d.isoformat(),
-                "Symbol": symbol,
-                "Stock": symbol,
-                "Company_Name": getattr(rec, "Company_Name", symbol),
-                "Sector": getattr(rec, "Sector", None),
-                "CMP": row["Close"],
-                "BB_Middle": row["BB_Middle"],
-                "BB_Upper": row["BB_Upper"],
-                "BB_Lower": row["BB_Lower"],
-                "BB_StdDev": row["BB_StdDev"],
-                "BB_Width_Pct": row["BB_Width_Pct"],
-                "BB_PctB": row["BB_PctB"],
-                "BB_Overshoot_Pct": row["BB_Overshoot_Pct"],
-                "HA_Open": row["HA_Open"],
-                "HA_Close": row["HA_Close"],
-                "HA_Body_Pct": row["HA_Body_Pct"],
-                "ATR14": row.get(f"ATR{cfg.history.atr_period}"),
-                "ATR_Pct": row["ATR_Pct"],
-                "BB_Overshoot_ATR": row["BB_Overshoot_ATR"],
-                "Volume": row["Volume"],
-                "Volume_Ratio_20": row.get("Volume_Ratio_20"),
-                "Dollar_Volume": row.get("Dollar_Volume"),
-                "SMA20": row.get("SMA20"),
-                "SMA50": row.get("SMA50"),
-                "SMA200": row.get("SMA200"),
-                "Dist_SMA50_Pct": row.get("Dist_SMA50_Pct"),
-                "Dist_SMA200_Pct": row.get("Dist_SMA200_Pct"),
-                "RS_20D": row.get("RS_20D"),
-                "RS_60D": row.get("RS_60D"),
-                "RS_120D": row.get("RS_120D"),
-                "Breakout_Type": row.get("Breakout_Type"),
-                "Days_Above_Upper_BB": row.get("Days_Above_Upper_BB"),
-                "Market_Regime": row.get("Market_Regime"),
-                "Rows": len(df_clean),
-                "History_Status": HISTORY_SUFFICIENT,
-                "Data_Status": data_status,
-                "History_Quality": row.get("History_Quality"),
-                "Benchmark_Status": benchmark_status,
-                "Score_Status": score_result.status,
-                "Research_Heuristic_Score": score_result.score,
-                "Price_Basis": symbol_price_basis,
-                "BB_Breakout": bb_breakout,
-                "BB_Size_OK": bb_size_ok,
-                "HA_Strength_OK": ha_strength_ok,
-                "Primary_Signal": True,
-                "Optional_Filter_Status": filter_result.optional_pass,
-                "Optional_Filters_Passed": filter_result.optional_pass,
-                "Failure_Category": None,
-                "Failure_Reason": None,
-                "Signal_Reason": build_signal_reason(row),
-            }
+            out_row = _diagnostic_row(
+                symbol,
+                rec,
+                Rows=len(df_clean),
+                History_Status=HISTORY_SUFFICIENT,
+                Data_Status=data_status,
+                Price_Basis=symbol_price_basis,
+                BB_Breakout=bb_breakout,
+                BB_Size_OK=bb_size_ok,
+                HA_Strength_OK=ha_strength_ok,
+                Primary_Strategy_Status=STRATEGY_STATUS_EVALUATED,
+                Primary_Signal=True,
+                Primary_Failure_Stage=None,
+                Primary_Failure_Reason=None,
+                Optional_Filter_Status=filter_result.optional_pass,
+                Optional_Filters_Passed=filter_result.optional_pass,
+                Signal_Reason=build_signal_reason(row),
+                **_feature_fields(symbol, row, last_bar_date_d, benchmark_status, score_result, cfg.history.atr_period),
+            )
             diagnostics_rows.append(out_row)
             if data_status == DataStatus.CURRENT and filter_result.optional_pass:
                 signal_rows.append(out_row)
@@ -297,15 +459,48 @@ def run_scan(
         except SignalMathError as e:
             # A sanity-gate trip is a genuine bug signal (indicator math and its own row
             # disagree), never routine — always logged loudly and bucketed separately from
-            # ordinary data-validation failures.
+            # ordinary data-validation failures. Whatever was already computed for this symbol
+            # (possibly the full feature row, possibly nothing) is still preserved below rather
+            # than discarded (Task 4) — a sanity-gate trip is a reason to distrust the SIGNAL
+            # decision, not a reason to hide the numbers that tripped it.
             security_scan_failures += 1
             log_failure(logger, run_id=run_id, security=symbol, stage="sanity_gate", provider=data_provider.name, exc=e)
+            extra_fields = (
+                _feature_fields(symbol, row, last_bar_date_d, benchmark_status, score_result, cfg.history.atr_period)
+                if row is not None
+                else {}
+            )
             diagnostics_rows.append(
                 _diagnostic_row(
                     symbol,
                     rec,
+                    Rows=len(df_clean) if df_clean is not None else None,
+                    History_Status=HISTORY_SUFFICIENT if df_clean is not None else None,
+                    Data_Status=data_status if data_status is not None else DataStatus.UNAVAILABLE,
+                    Price_Basis=symbol_price_basis,
+                    BB_Breakout=bb_breakout,
+                    BB_Size_OK=bb_size_ok,
+                    HA_Strength_OK=ha_strength_ok,
+                    # Review-round-1 fix: bb_breakout/bb_size_ok/ha_strength_ok/mandatory_pass are
+                    # computed BEFORE either sanity-gate call (check_bollinger_ordering,
+                    # check_heikin_ashi_ordering, check_pass_row -- see the try block above), so
+                    # a SignalMathError here ALWAYS means the baseline strategy condition WAS
+                    # already evaluated; it must never be reported as NOT_EVALUABLE (that status
+                    # means "never reached the strategy check at all"). The condition below is
+                    # written defensively against `bb_breakout is not None` (rather than just
+                    # asserting EVALUATED unconditionally) so this stays correct even if a future
+                    # refactor changes call order.
+                    Primary_Strategy_Status=(
+                        STRATEGY_STATUS_EVALUATED if bb_breakout is not None else STRATEGY_STATUS_NOT_EVALUABLE
+                    ),
+                    Primary_Signal=False,
+                    Primary_Failure_Stage=STAGE_SANITY_GATE,
+                    Primary_Failure_Reason=REASON_SANITY_GATE_FAILURE,
+                    Optional_Filter_Status=filter_result.optional_pass if filter_result is not None else None,
+                    Optional_Filters_Passed=filter_result.optional_pass if filter_result is not None else None,
                     Failure_Category=FAILURE_SECURITY_SCAN,
                     Failure_Reason=str(e),
+                    **extra_fields,
                 )
             )
             scan_log_rows.append(
@@ -323,12 +518,37 @@ def run_scan(
         except Exception as e:  # noqa: BLE001 - per-symbol isolation is the point (PART 15)
             security_scan_failures += 1
             log_failure(logger, run_id=run_id, security=symbol, stage="scan", provider=data_provider.name, exc=e)
+            extra_fields = (
+                _feature_fields(symbol, row, last_bar_date_d, benchmark_status, score_result, cfg.history.atr_period)
+                if row is not None
+                else {}
+            )
             diagnostics_rows.append(
                 _diagnostic_row(
                     symbol,
                     rec,
+                    Rows=len(df_clean) if df_clean is not None else None,
+                    History_Status=HISTORY_SUFFICIENT if df_clean is not None else None,
+                    Data_Status=data_status if data_status is not None else DataStatus.UNAVAILABLE,
+                    Price_Basis=symbol_price_basis,
+                    BB_Breakout=bb_breakout,
+                    BB_Size_OK=bb_size_ok,
+                    HA_Strength_OK=ha_strength_ok,
+                    # Review-round-1 fix: an unexpected exception can occur at any point (data
+                    # fetch, feature build, or after the strategy condition already ran) -- unlike
+                    # the sanity-gate handler above, here bb_breakout genuinely MAY be None, so
+                    # this conditional is load-bearing, not just defensive.
+                    Primary_Strategy_Status=(
+                        STRATEGY_STATUS_EVALUATED if bb_breakout is not None else STRATEGY_STATUS_NOT_EVALUABLE
+                    ),
+                    Primary_Signal=False,
+                    Primary_Failure_Stage=STAGE_SCAN,
+                    Primary_Failure_Reason=REASON_SECURITY_SCAN_FAILURE,
+                    Optional_Filter_Status=filter_result.optional_pass if filter_result is not None else None,
+                    Optional_Filters_Passed=filter_result.optional_pass if filter_result is not None else None,
                     Failure_Category=FAILURE_SECURITY_SCAN,
                     Failure_Reason=str(e),
+                    **extra_fields,
                 )
             )
             scan_log_rows.append(

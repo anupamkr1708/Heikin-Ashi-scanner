@@ -97,7 +97,11 @@ def _safe_value(value):
 
 @dataclass
 class ReportSheets:
-    live_signals: pd.DataFrame = field(default_factory=pd.DataFrame)
+    live_signals: pd.DataFrame = field(default_factory=pd.DataFrame)  # written to the "EOD_Signals"
+    # tab (Task 7) -- the Python-level field name is kept as `live_signals` for API/backward
+    # compatibility (nothing else in this codebase reads the xlsx back by field name), but the
+    # client-facing Excel tab itself no longer says "Live_Signals": this is EOD/T-1 data, never
+    # a live/intraday feed, and the old name risked implying otherwise. See CHANGELOG.md.
     stale_signals: pd.DataFrame = field(default_factory=pd.DataFrame)
     diagnostics: pd.DataFrame = field(default_factory=pd.DataFrame)
     data_health: pd.DataFrame = field(default_factory=pd.DataFrame)
@@ -108,6 +112,7 @@ class ReportSheets:
     research_summary: pd.DataFrame = field(default_factory=pd.DataFrame)
     forward_returns: pd.DataFrame = field(default_factory=pd.DataFrame)
     sensitivity: pd.DataFrame = field(default_factory=pd.DataFrame)
+    summary: pd.DataFrame = field(default_factory=pd.DataFrame)  # Task 5: EOD_Summary sheet
     readme_text: str = ""
 
 
@@ -115,10 +120,14 @@ def write_report(sheets: ReportSheets, output_path: str | Path) -> Path:
     wb = openpyxl.Workbook()
     wb.remove(wb.active)  # drop the default empty sheet
 
-    _write_sheet(wb, "Live_Signals", sheets.live_signals)
+    # Task 14 sheet ordering: summary first, signals second, diagnostics (the large detail sheet)
+    # later, methodology/readme last -- a reader opens the workbook and sees the answer before
+    # the evidence.
+    _write_sheet(wb, "EOD_Summary", sheets.summary)
+    _write_sheet(wb, "EOD_Signals", sheets.live_signals)
     _write_sheet(wb, "Stale_Signals", sheets.stale_signals)
-    _write_sheet(wb, "Diagnostics", sheets.diagnostics)
     _write_sheet(wb, "Data_Health", sheets.data_health)
+    _write_sheet(wb, "Diagnostics", sheets.diagnostics)
     _write_sheet(wb, "Scan_Log", sheets.scan_log)
     _write_sheet(wb, "Universe", sheets.universe)
     _write_sheet(wb, "Parameters", sheets.parameters)
@@ -142,9 +151,16 @@ def write_report(sheets: ReportSheets, output_path: str | Path) -> Path:
 def _default_readme() -> str:
     return (
         "This is an NSE EOD/T-1 Technical Scanner report — NOT a live/intraday signal feed.\n"
+        "Start with EOD_Summary for a one-page overview of this run (universe, coverage, "
+        "strategy parameters, version/commit provenance).\n"
         "See Data_Health for whether this run is trustworthy (RUN_HEALTH = GREEN/YELLOW/RED).\n"
-        "Only rows with Data_Status = CURRENT appear in Live_Signals; everything else is in "
-        "Stale_Signals.\n"
+        "Only rows with Data_Status = CURRENT appear in EOD_Signals (formerly named "
+        "'Live_Signals' — renamed because this is EOD/T-1 data, never a live/intraday feed); "
+        "everything else is in Stale_Signals.\n"
+        "Diagnostics contains EVERY universe member that was successfully processed — passing "
+        "or not — with its full computed feature snapshot and, for non-signal rows, an explicit "
+        "Primary_Failure_Reason. NOT_EVALUABLE rows (no/insufficient data) are distinguishable "
+        "from EVALUATED rows that simply didn't meet the strategy condition.\n"
         "*_Pct columns are percentage-POINT values (e.g. 2.31 means 2.31%), formatted with a "
         "literal '%' suffix — they are not Excel-native percentages and are not re-scaled.\n"
         "BB_PctB is a RATIO (0=lower band, 1=upper band), not a percentage.\n"

@@ -23,6 +23,7 @@ from nse_scanner.models.market_data import NormalizedBarMeta, PriceBasis
 from nse_scanner.pipeline.scan import run_scan
 from nse_scanner.reporting.excel import write_report
 from nse_scanner.reporting.run_manifest import build_run_manifest
+from nse_scanner.reporting.summary import build_summary_sheet
 
 
 @dataclass
@@ -108,9 +109,6 @@ def run_offline_fixture_scan(cfg: ScannerConfig, session: SessionInfo, store: Ma
 
     result = run_scan(cfg, universe_provider, data_provider, benchmark_provider, synthetic_session, holidays=set())
 
-    fname = f"NSE_Technical_Scanner_OFFLINE_FIXTURE_{last_date.date().isoformat()}.xlsx"
-    report_path = Path(cfg.paths.reports_dir) / fname
-    write_report(result.sheets, report_path)
     manifest = build_run_manifest(
         run_id=result.run_id,
         cfg=cfg,
@@ -137,6 +135,11 @@ def run_offline_fixture_scan(cfg: ScannerConfig, session: SessionInfo, store: Ma
             "signals_stale": result.signals_stale,
         },
     )
+    result.sheets.summary = build_summary_sheet(result, cfg, synthetic_session, manifest)
+    fname = f"NSE_Technical_Scanner_OFFLINE_FIXTURE_{last_date.date().isoformat()}.xlsx"
+    report_path = Path(cfg.paths.reports_dir) / fname
+    write_report(result.sheets, report_path)
+
     manifest_path = Path(cfg.paths.reports_dir) / "run_manifest_OFFLINE_FIXTURE.json"
     manifest.write(manifest_path)
 

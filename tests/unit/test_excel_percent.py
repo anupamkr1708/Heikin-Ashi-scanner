@@ -29,7 +29,9 @@ def test_write_report_roundtrip_preserves_value_magnitude(tmp_path):
     write_report(sheets, out_path)
 
     wb = openpyxl.load_workbook(out_path)
-    ws = wb["Live_Signals"]
+    # Task 7: the tab is now named "EOD_Signals" (was "Live_Signals") -- this is EOD/T-1 data,
+    # never a live/intraday feed. See CHANGELOG.md.
+    ws = wb["EOD_Signals"]
     # Header row 1, data row 2. Find BB_Overshoot_Pct column.
     headers = [c.value for c in ws[1]]
     col = headers.index("BB_Overshoot_Pct") + 1
