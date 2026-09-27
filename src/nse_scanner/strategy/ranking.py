@@ -2,7 +2,8 @@
 
 **NOT A PROBABILITY. NOT EXPECTED RETURN. NOT STATISTICALLY VALIDATED.** Named
 `Research_Heuristic_Score` throughout the codebase and reports for exactly that reason. It exists
-only to order candidates within a single day's Live_Signals sheet.
+only to order candidates within a single day's EOD_Signals sheet (named "Live_Signals" before
+the Task 7 client-reporting-hardening rename).
 
 If the benchmark (needed for the RS component) is unavailable, the score is NOT silently
 renormalized over the remaining components (BUG 4 / BUG 16) — `Score_Status` becomes "PARTIAL"

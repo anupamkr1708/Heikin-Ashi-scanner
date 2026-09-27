@@ -68,7 +68,17 @@ def test_full_offline_scan_pipeline_produces_a_signal_and_a_valid_report(tmp_pat
 
 
 def test_scan_survives_a_broken_symbol_without_halting(tmp_path):
-    """One bad symbol must never halt the whole scan (PART 15)."""
+    """One bad symbol must never halt the whole scan (PART 15).
+
+    Client-reporting-hardening note: a symbol with NO data at all is a routine, expected
+    data-validation outcome (Task 3's NOT_EVALUABLE_NO_DATA), not an unexpected "security scan"
+    bug -- so it now correctly lands in Diagnostics with that reason rather than in
+    result.failures/Scan_Log (which is reserved for genuine unexpected exceptions and sanity-gate
+    trips; see pipeline/scan.py's module docstring on this exact distinction). This test used to
+    assert on the OLD, miscategorized behavior (the no-data raise sat outside the inner
+    try/except that catches DataValidationError, so it fell through to the generic-exception
+    handler and was counted as a security_scan_failure) -- fixed as part of that same branch.
+    """
     cfg = ScannerConfig()
     universe_df = generate_synthetic_universe()
     histories = {sym: generate_synthetic_ohlcv(sym, n_days=80) for sym in SYNTHETIC_SYMBOLS[1:]}
@@ -83,5 +93,9 @@ def test_scan_survives_a_broken_symbol_without_halting(tmp_path):
     session = SessionInfo(last_date.date(), last_date.date(), last_date.date(), last_date.date())
 
     result = run_scan(cfg, universe_provider, data_provider, benchmark_provider, session, holidays=set())
-    assert any(f["security"] == SYNTHETIC_SYMBOLS[0] for f in result.failures)
+    diag = result.sheets.diagnostics
+    broken_row = diag[diag["Symbol"] == SYNTHETIC_SYMBOLS[0]].iloc[0]
+    assert broken_row["Primary_Failure_Reason"] == "NOT_EVALUABLE_NO_DATA"
+    assert result.data_validation_failures == 1
+    assert result.security_scan_failures == 0
     assert result.constituent_count == len(SYNTHETIC_SYMBOLS)  # scan still covered everyone else

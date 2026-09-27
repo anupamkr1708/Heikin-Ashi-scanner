@@ -26,7 +26,26 @@ class DataProviderError(NseScannerError):
 
 
 class DataValidationError(NseScannerError):
-    """Raised when OHLCV data fails schema or sanity validation."""
+    """Raised when OHLCV data fails schema or sanity validation.
+
+    `reason` is an optional STRUCTURED category (one of the ``REASON_*`` class constants below)
+    for callers that need to classify a failure programmatically -- e.g.
+    pipeline/scan.py's Primary_Failure_Reason / Insufficient_History_Count accounting -- without
+    depending on substring-matching the free-text message, which is fragile to any future
+    wording change. `reason` defaults to `None` so every existing call site that only passes a
+    message (including `FrameNormalizationError`, a subclass that does not override `__init__`)
+    keeps working unchanged; a caller that doesn't set `reason` simply isn't machine-classifiable
+    beyond "some DataValidationError happened", which callers must treat as the generic/umbrella
+    case rather than guessing from text.
+    """
+
+    REASON_NO_DATA = "no_data"
+    REASON_MISSING_COLUMNS = "missing_columns"
+    REASON_INSUFFICIENT_ROWS = "insufficient_rows"
+
+    def __init__(self, message: str, reason: str | None = None) -> None:
+        super().__init__(message)
+        self.reason = reason
 
 
 class FrameNormalizationError(DataValidationError):

@@ -39,13 +39,23 @@ universe_snapshot_date, universe_source, constituent_count, data_provider, data_
 expected_session, signal_date, price_basis, configuration (the FULL resolved ScannerConfig),
 research_mode, status`.
 
-## `signals` (one row per `Live_Signals`/`Diagnostics` entry, `pipeline/scan.py`)
+## `signals` (one row per `EOD_Signals`/`Diagnostics` entry, `pipeline/scan.py`)
+
+`EOD_Signals` sheet was named `Live_Signals` before the client-reporting-hardening rename (this
+is EOD/T-1 data, never a live/intraday feed).
 
 `Rank, Signal_Date, Stock, Company_Name, Sector, CMP, BB_Middle/Upper/Lower/StdDev/Width_Pct/PctB,
 BB_Overshoot_Pct, HA_Open/Close/Body_Pct, ATR14, ATR_Pct, BB_Overshoot_ATR, Volume,
-Volume_Ratio_20, Dollar_Volume, SMA20/50/200, Dist_SMA50_Pct, Dist_SMA200_Pct, RS_20D/60D/120D,
-Breakout_Type, Days_Above_Upper_BB, Market_Regime, Data_Status, History_Quality,
-Benchmark_Status, Score_Status, Research_Heuristic_Score, Optional_Filters_Passed, Signal_Reason`.
+Volume_Ratio_20, Dollar_Volume, SMA20/50/200 (+_Status), Dist_SMA50_Pct, Dist_SMA200_Pct,
+RS_20D/60D/120D, Breakout_Type, Days_Above_Upper_BB, Market_Regime, Data_Status, History_Quality,
+Benchmark_Status, Score_Status, Research_Heuristic_Score, Optional_Filters_Passed, Signal_Reason,
+Primary_Strategy_Status, Primary_Failure_Stage, Primary_Failure_Reason`.
+
+Every successfully-processed universe member — not just those that passed the strategy
+condition — gets exactly one `Diagnostics` row with this same full field set; a non-signal row's
+`Primary_Failure_Reason` explains why (e.g. `CLOSE_NOT_ABOVE_UPPER_BB`), and a row that could not
+be evaluated at all (`NOT_EVALUABLE_NO_DATA`/`NOT_EVALUABLE_INSUFFICIENT_HISTORY`) is
+distinguishable from one that was evaluated and simply didn't meet the condition.
 
 ## `research_events` (`research/events.py`, `cli/run_research.py` output)
 

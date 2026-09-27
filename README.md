@@ -84,9 +84,13 @@ trust it against real data, and for CI/development/debugging.
 6. Optionally applies confirmation filters (all off by default), classifies breakout state
    (fresh/continuation/failed), computes a frankly-labeled `Research_Heuristic_Score`
    (explicitly **not** a probability), and generates a plain-language reason string.
-7. Writes an Excel workbook (`Live_Signals`, `Stale_Signals`, `Diagnostics`, `Data_Health`,
+7. Writes an Excel workbook (`EOD_Summary`, `EOD_Signals` — renamed from `Live_Signals`; this is
+   EOD/T-1 data, never a live/intraday feed — `Stale_Signals`, `Data_Health`, `Diagnostics`,
    `Scan_Log`, `Universe`, `Parameters`, `Market_Regime`, plus research sheets) and a
-   machine-readable `run_manifest.json` for full reproducibility.
+   machine-readable `run_manifest.json` for full reproducibility. Every successfully-evaluated
+   security appears in `Diagnostics` with its full computed feature snapshot and, if it isn't a
+   signal, an explicit `Primary_Failure_Reason` — a 200-symbol universe produces 200 Diagnostics
+   rows, not just the handful that passed.
 
 ## Commands
 

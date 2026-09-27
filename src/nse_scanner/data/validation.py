@@ -30,18 +30,22 @@ def validate_and_clean_ohlc(df: pd.DataFrame | None, min_rows: int) -> tuple[pd.
     dropped for non-positive prices) so they are never silently invisible."""
     issues: list[str] = []
     if df is None or df.empty:
-        raise DataValidationError("no data returned")
+        raise DataValidationError("no data returned", reason=DataValidationError.REASON_NO_DATA)
 
     missing_input_cols = [c for c in REQUIRED_COLUMNS if c not in df.columns]
     if missing_input_cols:
-        raise DataValidationError(f"missing required columns: {missing_input_cols}")
+        raise DataValidationError(
+            f"missing required columns: {missing_input_cols}", reason=DataValidationError.REASON_MISSING_COLUMNS
+        )
 
     df = normalize_ohlcv_columns(df)
     rows_in = len(df)
 
     missing_cols = [c for c in REQUIRED_COLUMNS if c not in df.columns]
     if missing_cols:
-        raise DataValidationError(f"missing required columns: {missing_cols}")
+        raise DataValidationError(
+            f"missing required columns: {missing_cols}", reason=DataValidationError.REASON_MISSING_COLUMNS
+        )
 
     df = df.dropna(subset=["Open", "High", "Low", "Close"])
     n_after_na_drop = len(df)
@@ -75,7 +79,8 @@ def validate_and_clean_ohlc(df: pd.DataFrame | None, min_rows: int) -> tuple[pd.
 
     if len(df) < min_rows:
         raise DataValidationError(
-            f"insufficient history for PRIMARY calculation: {len(df)} valid rows (need >= {min_rows})"
+            f"insufficient history for PRIMARY calculation: {len(df)} valid rows (need >= {min_rows})",
+            reason=DataValidationError.REASON_INSUFFICIENT_ROWS,
         )
 
     report = ValidationReport(ok=True, rows_in=rows_in, rows_valid=len(df), issues=issues)

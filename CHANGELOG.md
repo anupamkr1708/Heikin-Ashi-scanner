@@ -1,5 +1,90 @@
 # Changelog
 
+## 1.5.0 — client-reporting-hardening: complete diagnostics, EOD_Summary sheet, version-consistency fix
+
+- **Fixed: application version drift.** `pyproject.toml` declared `version = "1.4.0"` while
+  `src/nse_scanner/version.py` separately hard-coded `__version__ = "1.3.1"` — two independently
+  drifting sources of truth, meaning a built 1.4.0 package could still emit run manifests
+  claiming `software_version=1.3.1`. `version.py` now reads `__version__` back from installed
+  package metadata (`importlib.metadata.version("nse-scanner")`) instead of re-declaring it, so
+  `pyproject.toml` is the single authoritative source. **Fails fast** (raises `RuntimeError` at
+  import time) if package metadata cannot be resolved at all, rather than silently falling back
+  to a placeholder version that could otherwise end up in a client-facing run manifest. New
+  `tests/unit/test_version_consistency.py`. `strategy_id` (`bb_ha_v1_base`) untouched.
+- **Fixed: Diagnostics only had ~2 fully-populated feature rows out of 200.** A real NIFTY_200 run
+  could produce 200 Diagnostics rows but only the (typically 1-3) rows that passed the baseline
+  signal had their computed CMP/BB_*/HA_*/ATR*/Volume*/SMA*/RS_*/etc. preserved — every other row
+  got only a handful of boolean flags. Every successfully-evaluated symbol (pass, mandatory-
+  condition fail, or even a sanity-gate failure, for debugging) now gets its full computed
+  feature snapshot in Diagnostics — the exact values the strategy itself already computed, never
+  recalculated.
+- **Added: explicit `Primary_Strategy_Status`/`Primary_Failure_Stage`/`Primary_Failure_Reason`.**
+  `Primary_Strategy_Status` is `EVALUATED` iff the mandatory BB+HA condition was actually checked
+  (true for a pass, a mandatory-condition fail, AND a post-evaluation sanity-gate trip — the
+  strategy check ran in all three cases, only NO_DATA/INSUFFICIENT_HISTORY/DATA_VALIDATION_FAILURE
+  are genuinely `NOT_EVALUABLE`), paired with a specific `Primary_Failure_Reason`:
+  `NOT_EVALUABLE_NO_DATA`, `NOT_EVALUABLE_INSUFFICIENT_HISTORY`, `DATA_VALIDATION_FAILURE`,
+  `CLOSE_NOT_ABOVE_UPPER_BB`, `BB_OVERSHOOT_OUT_OF_RANGE`, `HA_BODY_TOO_SMALL`,
+  `SANITY_GATE_FAILURE`, `SECURITY_SCAN_FAILURE`. A symbol that was successfully evaluated but
+  didn't meet the strategy condition is no longer indistinguishable from one with no data at all.
+  (Found and fixed a related pre-existing miscategorization: a symbol with literally no history
+  was being counted as a `security_scan_failure` instead of the routine, expected
+  `NOT_EVALUABLE_NO_DATA` it actually is — see `pipeline/scan.py` for detail.)
+- **Fixed: `LIMITED` history quality no longer implies a strategy failure.** A symbol with enough
+  rows for the baseline (`>= min_rows_primary`) but not enough for a secondary feature (e.g.
+  `SMA200`, needing 200 rows) is `Primary_Strategy_Status=EVALUATED` with that one feature
+  reported as `NA` and its own `*_Status` field — not folded into a blanket failure.
+- **Data-validation classification is now structured, not text-matched.** `DataValidationError`
+  carries an explicit `reason` (`REASON_NO_DATA` / `REASON_MISSING_COLUMNS` /
+  `REASON_INSUFFICIENT_ROWS`), set at each raise site in `data/validation.py`. Categorization in
+  `pipeline/scan.py` reads that structured field rather than substring-matching the free-text
+  exception message (e.g. `"insufficient history" in str(e)`), which was fragile to any future
+  wording change. Fully backward compatible: `reason` defaults to `None`, so every existing raise
+  site (including `FrameNormalizationError`, a subclass) keeps working unmodified.
+- **`insufficient_history_count` now reflects only its true, specific category.** Previously
+  every `DataValidationError` (no data at all, a genuine OHLC/column quality problem, or an
+  actual row-count shortfall) incremented `insufficient_history_count`, over-counting it. Only a
+  `NOT_EVALUABLE_INSUFFICIENT_HISTORY` classification increments it now;
+  `data_validation_failures` remains the correct umbrella count across all three categories, per
+  the pre-existing `Failure_Category=data_validation_failure` contract.
+- **Added: `EOD_Summary` sheet** (`reporting/summary.py`) — one-page run overview: identity/
+  provenance (Run_ID, Git_Commit, Software_Version, Run_Health), session dates, universe &
+  coverage counts, benchmark/regime, the immutable strategy parameters, and an explicit
+  EOD/not-intraday, `Research_Heuristic_Score`-is-not-a-probability methodology statement. Every
+  value is read back from the same run objects the rest of the report is built from. The
+  manifest is now built *before* the Excel report (was after) so the two can never disagree.
+- **Renamed:** Excel tab `Live_Signals` → `EOD_Signals` — this is EOD/T-1 data, never a
+  live/intraday feed, and the old name risked implying otherwise. (Python-level `ReportSheets`
+  field name kept as `live_signals` for API compatibility.) Sheet order is now `EOD_Summary`,
+  `EOD_Signals`, `Stale_Signals`, `Data_Health`, `Diagnostics`, then the rest.
+- **New tests (19 total):** `tests/integration/test_client_reporting_hardening.py` (14 tests: a
+  synthetic 200-symbol universe proving 200 Diagnostics rows; explicit coverage of all four
+  NOT_EVALUABLE/FAIL categories incl. a genuine `DATA_VALIDATION_FAILURE` case; the
+  `insufficient_history_count` vs `data_validation_failures` counter split, cross-checked against
+  Data_Health; a forced sanity-gate trip asserting `Primary_Strategy_Status=EVALUATED`) plus
+  `tests/unit/test_version_consistency.py` (5 tests, incl. the fail-fast path).
+
+Deliberately **not** changed, per scope: the BB/HA strategy, indicator formulas, mainboard
+universe predicate/semantics (still `NSE_MAINBOARD_EQ` = `Series.isin(("EQ","BE"))`, safety gate
+`[500, 4000]` unchanged), optional confirmation filters (all still disabled by default), or the
+price-basis architecture — `BLENDED_RAW_NSE_ADJUSTED_YFINANCE_BOOTSTRAP` remains visible and
+un-silenced; the real fix (a genuinely corporate-action-adjusted continuous research series) is
+already tracked as an open item in `CODE_REVIEW.md` ("Price-basis architecture" /
+"Corporate-action synthetic testing" rows) and remains explicitly out of scope here, not
+newly deferred.
+
+Full validation: ruff check/format clean, mypy clean (79 files), **248/248 tests passed** (229
+pre-existing baseline + 19 new: 5 version-consistency + 14 client-reporting-hardening — corrected
+from an earlier internal draft that mis-stated this as "233 + 12", which double-counted nothing
+but mislabeled 4 of the 19 new tests as "pre-existing"), `git diff --check` clean,
+`python -m build --sdist --wheel --no-isolation` successful — the resulting wheel reports
+`__version__ == "1.5.0"` when installed fresh in a clean venv (proving the version-consistency
+fix holds through a real build, not just in an editable dev install). Real-network validation
+against live NSE/Yahoo data was not possible from this sandbox (no network path to
+`nseindia.com` / Yahoo Finance) — flagged rather than claimed; see this PR's description for the
+exact commands to run that validation locally.
+
+
 ## 1.4.0 — mainboard universe semantics: diagnostics, deterministic dedup, inert exclusion hook
 
 Forensic specification exercise + scoped implementation (see
