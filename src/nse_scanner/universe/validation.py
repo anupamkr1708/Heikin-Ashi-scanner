@@ -42,6 +42,21 @@ class UniverseSnapshot:
     # making "why is this row in/out" and "how did we get from N raw rows to M constituents"
     # answerable from the manifest without re-deriving them.
     diagnostics: dict | None = None
+    # mainboard-universe-integrity-v2 additions (Tasks 8 & 14) — all optional/default None, so the
+    # NIFTY_200 caller (build_snapshot below) is unaffected and its snapshot rows simply carry
+    # None for these. `source_date` is the source file's OWN report/effective date and is None when
+    # the source genuinely carries none (EQUITY_L.csv has no embedded date; niftyindices.com's
+    # constituent CSV has none we can rely on) — it is NEVER back-filled from `retrieved_at`.
+    # `snapshot_date_basis` says what `snapshot_date` (the record key above) actually means for
+    # this row: "SOURCE_DATE" (== source_date) or "RETRIEVAL_DATE_SOURCE_UNDATED" (the UTC date of
+    # retrieval, used only as a record key because no source date exists — consumers must not read
+    # it as one). `universe_definition_id` versions the membership RULES (independent of software
+    # version and strategy_id); `classification_rules_version` versions the ETF/REIT/InvIT/SME
+    # cross-reference logic that produced the exclusions.
+    source_date: date | None = None
+    snapshot_date_basis: str | None = None
+    universe_definition_id: str | None = None
+    classification_rules_version: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -62,6 +77,10 @@ class UniverseSnapshot:
             "eligible_count": self.eligible_count,
             "definition": self.definition,
             "diagnostics": self.diagnostics,
+            "source_date": self.source_date.isoformat() if self.source_date is not None else None,
+            "snapshot_date_basis": self.snapshot_date_basis,
+            "universe_definition_id": self.universe_definition_id,
+            "classification_rules_version": self.classification_rules_version,
         }
 
 

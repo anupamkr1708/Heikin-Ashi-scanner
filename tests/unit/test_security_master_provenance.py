@@ -17,9 +17,7 @@ import gzip
 from datetime import date, datetime, timezone
 from unittest.mock import patch
 
-import pytest
 from nse_scanner.data import nse_reports
-from nse_scanner.exceptions import DataProviderError
 from nse_scanner.testing.synthetic_market_data import generate_synthetic_security_file
 
 from tests.unit.test_security_master_discovery import _mock_get_factory, _Resp
@@ -99,14 +97,19 @@ def test_snapshot_keeps_source_date_and_retrieved_at_as_two_separate_fields(monk
     assert as_dict["retrieved_at"].startswith("2026-09-24")
 
 
-def test_snapshot_fails_safely_when_source_date_is_unparseable(monkeypatch):
-    """Part 2A item 4: when discovery only finds the undated EQUITY_L.csv fallback (no date can
-    be embedded/parsed at all), snapshot() must raise -- NEVER silently substitute retrieved_at
-    as if it were the source date. This is the specific failure mode the fix targets, not a
-    hypothetical: the undated template exists precisely because dated ones can 404."""
-    undated_url = "https://nsearchives.nseindia.com/content/equity/EQUITY_L.csv"
-    plain_csv = generate_synthetic_security_file().to_csv(index=False).encode("utf-8")  # EQUITY_L.csv
-    # is not gzipped -- fetch_security_file picks is_gzip purely from the URL's ".gz" suffix.
+def test_snapshot_records_undated_source_as_explicitly_unknown_never_as_retrieval_date(monkeypatch):
+    """Task 8 (mainboard-universe-integrity-v2), replacing the earlier
+    `test_snapshot_fails_safely_when_source_date_is_unparseable`.
+
+    CONTRACT CHANGE, deliberate: snapshot() used to RAISE when discovery matched only the undated
+    EQUITY_L.csv template. That was right while that template was a last-resort fallback; once it
+    became the primary source it would have made every mainboard snapshot impossible. What must
+    stay true is the underlying rule -- a retrieval timestamp is never presented AS a source date.
+    That is now enforced by two separate, labeled fields: `source_date` stays None, and
+    `snapshot_date_basis` says the record key is the retrieval date because no source date exists.
+    """
+    undated_url = "https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv"
+    plain_csv = generate_synthetic_security_file().to_csv(index=False).encode("utf-8")
     monkeypatch.setattr(nse_reports, "datetime", _FixedDatetime)
     with patch("requests.Session.get", _mock_get_factory({undated_url: _Resp(200, plain_csv)})):
         result = nse_reports.fetch_security_file(today=date(2026, 9, 24), max_lookback_days=0)
@@ -114,8 +117,36 @@ def test_snapshot_fails_safely_when_source_date_is_unparseable(monkeypatch):
     assert result.source_date is None  # honestly unknown, not guessed
 
     mainboard = nse_reports.derive_mainboard(result.frame)
-    with pytest.raises(DataProviderError, match="source/report date"):
-        nse_reports.snapshot(result, mainboard)
+    snap = nse_reports.snapshot(result, mainboard)
+
+    assert snap.source_date is None  # never back-filled from retrieved_at
+    assert snap.snapshot_date_basis == "RETRIEVAL_DATE_SOURCE_UNDATED"
+    assert snap.retrieved_at == result.retrieved_at  # still recorded, separately
+    as_dict = snap.to_dict()
+    assert as_dict["source_date"] is None
+    assert as_dict["snapshot_date_basis"] == "RETRIEVAL_DATE_SOURCE_UNDATED"
+
+
+def test_snapshot_dated_source_has_source_date_basis(monkeypatch):
+    """The dated-template path keeps its original meaning: snapshot_date IS the source date."""
+    dated_url = "https://nsearchives.nseindia.com/content/cm/NSE_CM_security_23092026.csv.gz"
+    gz = gzip.compress(generate_synthetic_security_file().to_csv(index=False).encode("utf-8"))
+    monkeypatch.setattr(nse_reports, "datetime", _FixedDatetime)
+    monkeypatch.setattr(
+        nse_reports,
+        "SECURITY_FILE_URL_TEMPLATES",
+        (
+            nse_reports.SecurityFileUrlTemplate(
+                "https://nsearchives.nseindia.com/content/cm/NSE_CM_security_{ddmmyyyy}.csv.gz", True
+            ),
+        ),
+    )
+    with patch("requests.Session.get", _mock_get_factory({dated_url: _Resp(200, gz)})):
+        result = nse_reports.fetch_security_file(today=date(2026, 9, 24), max_lookback_days=3)
+    snap = nse_reports.snapshot(result, nse_reports.derive_mainboard(result.frame))
+    assert snap.source_date == date(2026, 9, 23)
+    assert snap.snapshot_date == date(2026, 9, 23)
+    assert snap.snapshot_date_basis == "SOURCE_DATE"
 
 
 def test_discovery_result_source_date_is_none_when_discovery_fails_entirely():
