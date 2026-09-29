@@ -167,7 +167,7 @@ def test_undated_template_tried_only_once_across_the_date_window():
     with patch("requests.Session.get", _get):
         discover_report(max_lookback_days=3, today=today)
 
-    undated_url = "https://nsearchives.nseindia.com/content/equity/EQUITY_L.csv"
+    undated_url = "https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv"
     assert calls.count(undated_url) == 1
 
 

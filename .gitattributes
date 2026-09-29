@@ -1,0 +1,6 @@
+
+# Real NSE data fixtures (mainboard-universe-integrity-v2): these carry the CRLF line endings NSE
+# itself exports them with. Preserved byte-for-byte for authenticity (they are evidence files, not
+# source code) -- `-whitespace` tells `git diff --check` not to flag that CRLF as trailing
+# whitespace, rather than normalizing them to LF and silently diverging from the real download.
+tests/fixtures/nse_real_samples/*.csv -whitespace

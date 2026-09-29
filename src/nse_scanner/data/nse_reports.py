@@ -88,12 +88,36 @@ class SecurityFileUrlTemplate:
 # (PART 3 resilience). The first template's filename fragment is confirmed correct against the
 # live NSE circular (see module docstring) — the folder/date-availability assumption is the part
 # that was NOT confirmable from this sandbox.
+#
+# **mainboard-universe-integrity-v2 change:** `EQUITY_L.csv` is promoted from position 3 (a
+# last-resort fallback) to position 1 (primary), per MAINBOARD_UNIVERSE_SPEC.md Part B: it is the
+# only one of these three templates this project has ever actually verified against real bytes
+# (a real copy was supplied and analyzed this session — 2,585 rows, zero duplicate symbols, zero
+# ETF/REIT/InvIT/SME contamination), whereas the CM-MII master (now position 2/3) has never been
+# successfully fetched in any session of this project (the one real download attempt produced a
+# 0-byte file). This is a considered, evidenced reordering, not a removal — the CM-MII templates
+# remain as a richer-schema fallback (FinInstrmId/DelFlg/etc.) for whenever they do become
+# reachable.
+#
+# **Bug fixed this session:** the URL below used to read
+# `https://nsearchives.nseindia.com/content/equity/EQUITY_L.csv` (singular "equity"). Multiple
+# independently-verified real sources found via web research this session — a third-party
+# ISIN-database project's working fetch config, a Medium walkthrough's working code, the
+# `rsquaredacademy/nse2r` R package's own test-fixture path, and (strongest) a direct,
+# content-identical search-result match for the sibling file `INVITS_L.csv` at
+# `.../content/equities/INVITS_L.csv` (plural) whose rows are byte-identical to the real file
+# supplied this session — all agree on plural "equities". The singular form is therefore LIKELY
+# wrong, but this is NOT verified by a live fetch: this sandbox has no network path to
+# nseindia.com, and the HTTP 403s recorded for the singular URL in P1_PROVIDER_HARDENING_NOTES.md
+# were this sandbox's own egress block (`x-deny-reason: host_not_allowed`), not an NSE response,
+# so they are neither confirming nor contradicting evidence. Corroborated independently four
+# separate ways; to be confirmed by a real fetch from a network-enabled machine.
 SECURITY_FILE_URL_TEMPLATES: tuple[SecurityFileUrlTemplate, ...] = (
+    SecurityFileUrlTemplate("https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv", False),
     SecurityFileUrlTemplate("https://nsearchives.nseindia.com/content/cm/NSE_CM_security_{ddmmyyyy}.csv.gz", True),
     SecurityFileUrlTemplate(
         "https://nsearchives.nseindia.com/content/equity_bhavcopy/security_{ddmmyyyy}.csv.gz", True
     ),
-    SecurityFileUrlTemplate("https://nsearchives.nseindia.com/content/equity/EQUITY_L.csv", False),
 )
 
 # Column-name variants this parser will accept for the security master file, mapped to the
@@ -406,17 +430,30 @@ def parse_security_file(raw_bytes: bytes, is_gzip: bool = True) -> pd.DataFrame:
 
 
 def filter_mainboard_equity(security_df: pd.DataFrame) -> pd.DataFrame:
-    """NSE_MAINBOARD_EQ universe filter (PART 5 / continuation universe definitions): keeps only
-    the standard equity series, excluding ETFs/SME/debt/etc. 'EQ' and 'BE' are the standard
-    mainboard equity series; SME uses 'SM'/'ST', ETFs use 'EQ' too in some feeds but are
-    typically separately flagged — this filter is intentionally conservative (EQ/BE only) and
-    documented as such rather than silently guessing at other series codes.
+    """NSE_MAINBOARD_EQ universe filter (PART 5 / continuation universe definitions; extended
+    mainboard-universe-integrity-v2): keeps the mainboard equity series, excluding ETFs/SME/debt/
+    etc. 'EQ', 'BE', and 'BZ' are all mainboard-equity series per NSE's own official "Legend of
+    Series" (fetched directly this session): EQ = normal rolling settlement, BE = an existing
+    equity company moved to Trade-for-Trade surveillance, BZ = an existing equity company moved
+    to Trade-for-Trade (Z category) for SEBI non-compliance (CIR/MRD/DSA/31/2013) — all three are
+    STATUSES of a mainboard-listed company, not separate instrument classes. A real copy of
+    EQUITY_L.csv analyzed this session confirms all three genuinely occur in that exact file
+    (2,317 EQ / 241 BE / 27 BZ, 2,585 rows total, zero duplicate symbols).
+
+    `BZ` was silently excluded by the pre-this-branch predicate (`Series.isin(("EQ","BE"))`) with
+    no accompanying discussion of why — see MAINBOARD_UNIVERSE_SPEC.md Part B for the considered,
+    evidenced decision to include it. SME uses 'SM'/'ST'/'SZ' on an entirely separate NSE
+    platform/file (confirmed zero symbol overlap with EQUITY_L.csv this session); ETFs use 'EQ'
+    too (confirmed via the same Legend of Series: "Instrument type in Equity includes fully paid
+    equity shares/ETFs... units of REITs/INVITs") and are therefore NOT separable by Series at
+    all — see `apply_known_non_equity_exclusions` for the cross-reference this predicate alone
+    cannot provide.
 
     This is the pipeline's `derive_mainboard` stage — kept under its original name (rather than
     renamed) since `universe/mainboard.py` already imports it directly and renaming would be
     churn with no behavior change; `derive_mainboard` below is a thin alias for pipeline-naming
     consistency with the rest of this module."""
-    return security_df[security_df["Series"].isin(("EQ", "BE"))].copy()
+    return security_df[security_df["Series"].isin(("EQ", "BE", "BZ"))].copy()
 
 
 derive_mainboard = filter_mainboard_equity  # pipeline-stage alias, see docstring above
@@ -437,7 +474,7 @@ MAINBOARD_DIAGNOSTIC_FIELDS: tuple[str, ...] = (
     "FinInstrmTp",
 )
 
-# Deterministic EQ/BE identity preference for deduplication, NOT a change to which symbols are
+# Deterministic EQ/BE/BZ identity preference for deduplication, NOT a change to which symbols are
 # included. Evidence: (1) NSE's own "Legend of Series" and multiple real GSM/surveillance
 # circulars confirm BE is a trade-to-trade reclassification of an EXISTING EQ-listed company, not
 # a distinct security (see forensic report, "EQ vs BE"); (2) an independently-found real-world NSE
@@ -445,7 +482,13 @@ MAINBOARD_DIAGNOSTIC_FIELDS: tuple[str, ...] = (
 # identical convention explicitly as `series EQ > BE > BZ` when deduplicating one bar per ticker.
 # Before this constant existed, `universe/mainboard.py` deduplicated by NSE_Symbol via
 # `drop_duplicates()` with no preceding sort -- an undocumented, file-row-order-dependent tie-break.
-MAINBOARD_SERIES_DEDUP_PREFERENCE: tuple[str, ...] = ("EQ", "BE")
+# **mainboard-universe-integrity-v2:** BZ added to the preference tuple (was ("EQ","BE") only) to
+# match filter_mainboard_equity's now-inclusive predicate -- if a symbol somehow carries both a BE
+# and a BZ row (not observed in the real EQUITY_L.csv snapshot analyzed this session, which has
+# zero duplicate symbols at all, but the preference must still be total/well-defined for any input),
+# BE is preferred over BZ (less severe status wins), matching the same "less severe status wins"
+# logic already applied to EQ-over-BE.
+MAINBOARD_SERIES_DEDUP_PREFERENCE: tuple[str, ...] = ("EQ", "BE", "BZ")
 
 
 def deduplicate_mainboard(
@@ -521,35 +564,47 @@ def compute_mainboard_diagnostics(
 
 
 def snapshot(
-    result: SecurityFileResult, mainboard_df: pd.DataFrame, diagnostics: dict | None = None
+    result: SecurityFileResult,
+    mainboard_df: pd.DataFrame,
+    diagnostics: dict | None = None,
+    *,
+    universe_definition_id: str | None = None,
+    classification_rules_version: str | None = None,
 ) -> UniverseSnapshot:
     """The pipeline's final `snapshot` stage: turns a successful `fetch_security_file` result plus
-    its EQ/BE-filtered mainboard frame into a `UniverseSnapshot` record carrying full provenance
-    (source URL, file hash, schema version, raw vs eligible counts) — the same record type
-    `universe/validation.py::build_snapshot` produces for NIFTY_200, reused here rather than
-    inventing a parallel type."""
-    # Provenance fix (P1 forensic finding, Part 2): `snapshot_date` must be the security FILE's
-    # own report/effective date (e.g. NSE_CM_security_23092026.csv.gz -> 2026-09-23), never the
-    # retrieval timestamp (result.retrieved_at) -- those are separate concepts that can legitimately
-    # disagree (a file dated 2026-09-23 retrieved on 2026-09-24). `retrieved_at` remains recorded
-    # separately on the UniverseSnapshot/SecurityFileResult and is never overwritten here.
-    # Fail safely rather than silently substituting retrieved_at when no source date could
-    # honestly be attributed (e.g. discovery fell back to an undated URL template) -- this is the
-    # exact "malformed/unparseable source date" case this fix must not paper over.
-    if result.source_date is None:
-        raise DataProviderError(
-            "Cannot build a NSE_MAINBOARD_EQ UniverseSnapshot without a source/report date: "
-            f"the discovered security-file URL ({result.source_url!r}) does not embed a "
-            "parseable report date (discovery matched an undated fallback template). Refusing "
-            "to substitute the retrieval timestamp as if it were the source date -- that is "
-            "exactly the provenance bug this check exists to prevent. Re-run discovery, or "
-            "extend SECURITY_FILE_URL_TEMPLATES so the winning template carries a real date."
-        )
+    its filtered/deduplicated mainboard frame into a `UniverseSnapshot` record carrying full
+    provenance (source URL, file hash, schema version, raw vs eligible counts) — the same record
+    type `universe/validation.py::build_snapshot` produces for NIFTY_200, reused here rather than
+    inventing a parallel type.
+
+    **Source date vs retrieval date (Task 8, mainboard-universe-integrity-v2).** The source
+    file's own report/effective date is recorded in `UniverseSnapshot.source_date` and is NEVER
+    back-filled from `retrieved_at`. Two cases:
+      * the discovered URL embeds a real report date (dated CM-MII templates): `source_date` and
+        `snapshot_date` are that date, `snapshot_date_basis="SOURCE_DATE"`.
+      * the source carries no date at all (the undated `EQUITY_L.csv` template — the primary
+        source as of this branch): `source_date=None`; `snapshot_date` is set to the UTC date of
+        retrieval purely so the record has a key, and `snapshot_date_basis=
+        "RETRIEVAL_DATE_SOURCE_UNDATED"` says so explicitly. `retrieved_at` is always recorded
+        separately either way.
+    **Contract change from the prior version of this function, made deliberately:** it used to
+    RAISE when no source date existed. That was the right call while the undated template was a
+    last-resort fallback, but once `EQUITY_L.csv` became the primary source it would have made
+    every mainboard snapshot impossible. The rule that matters — never present a retrieval
+    timestamp *as* a source date — is now enforced by the two separate, labeled fields instead of
+    by refusing to record anything.
+    """
+    if result.source_date is not None:
+        snapshot_date = result.source_date
+        snapshot_date_basis = "SOURCE_DATE"
+    else:
+        snapshot_date = result.retrieved_at.date()
+        snapshot_date_basis = "RETRIEVAL_DATE_SOURCE_UNDATED"
 
     has_symbol = "NSE_Symbol" in mainboard_df.columns
     return UniverseSnapshot(
         universe_id="NSE_MAINBOARD_EQ",
-        snapshot_date=result.source_date,
+        snapshot_date=snapshot_date,
         source=result.source_url,
         source_version=None,
         retrieved_at=result.retrieved_at,
@@ -563,6 +618,14 @@ def snapshot(
         schema_version=SECURITY_FILE_SCHEMA_VERSION,
         raw_row_count=result.row_count,
         eligible_count=len(mainboard_df),
-        definition="NSE_MAINBOARD_EQ = CM-MII security file rows with Series in {EQ, BE}",
+        definition=(
+            "NSE_MAINBOARD_EQ = official NSE security-list rows with Series in {EQ, BE, BZ}, "
+            "minus symbols/ISINs on NSE's ETF/REIT/InvIT/SME lists, deduplicated by NSE_Symbol "
+            "(EQ > BE > BZ)"
+        ),
         diagnostics=diagnostics,
+        source_date=result.source_date,
+        snapshot_date_basis=snapshot_date_basis,
+        universe_definition_id=universe_definition_id,
+        classification_rules_version=classification_rules_version,
     )
