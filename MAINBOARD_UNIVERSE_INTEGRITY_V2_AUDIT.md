@@ -120,14 +120,17 @@ NSE_MAINBOARD_EQ today even though the machinery to compute the right value alre
 
 ### A.8 Whether a point-in-time security-master snapshot is stored and replayable
 
-**No.** `cli/update_universe.py` writes a `security_master_latest` parquet table — the word
-"latest" is accurate: each run overwrites it (`store.write_parquet`, not append/versioned).
-`universe_snapshots` is append-friendly by shape (one row per run) but, per A.7, carries the wrong
-date for mainboard and no diagnostics. There is no mechanism to ask "what was the mainboard
-universe on 2026-09-15" — only "what is it now, and here is a possibly-growing log of past
-`retrieved_at` timestamps with no accompanying diagnostics." Task 8 is explicit that this stage
-should not *claim* PIT support it doesn't have; consider this audit that explicit non-claim,
-confirmed at the code level rather than asserted from the docs alone.
+**No.** `cli/update_universe.py` writes two parquet tables via `MarketDataStore.write_parquet`,
+which is `df.to_parquet(path, index=False)` — **an overwrite, not an append**. Both
+`security_master_latest` (the member list) and `universe_snapshots` (a single-row provenance
+record) therefore hold only the *most recent* run. (**Correction:** an earlier revision of this
+section described `universe_snapshots` as "append-friendly by shape... a possibly-growing log of
+past `retrieved_at` timestamps". That was wrong — reading `storage.py::write_parquet` shows it is
+overwritten each run, so there is no history at all, not merely a history with the wrong dates.)
+Per A.7, that single row also carries the wrong date for mainboard and no diagnostics. There is
+no mechanism to ask "what was the mainboard universe on 2026-09-15", and no previous membership
+to diff against for drift detection. Task 8 is explicit that this stage should not *claim* PIT
+support it doesn't have; consider this audit that explicit non-claim, confirmed at the code level.
 
 ### A.9 Where universe semantics are currently encoded
 

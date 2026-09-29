@@ -197,18 +197,42 @@ different algorithm.
 
 ---
 
-## Explicitly deferred to Task 5+ implementation commits (not yet done as of this document)
+## Implementation status (updated as of the implementation commits following this document)
 
-- Wiring `eq_etfseclist.csv`/`REITS_L.csv`/`INVITS_L.csv` fetchers into
-  `universe/mainboard.py`'s exclusion hook with real data (currently ships empty).
-- Promoting `EQUITY_L.csv` to primary source order and fixing the singular/plural URL bug.
-- Extending `MAINBOARD_SERIES_DEDUP_PREFERENCE` and `filter_mainboard_equity` to include `BZ`.
-- Redesigning the `[500, 4000]` cardinality gate (Task 6) around `EQUITY_L.csv`'s real shape.
-- An explicit `instrument_classification` field (`ordinary_equity | ETF | REIT | InvIT | SME |
-  other`) per Task 7's acceptance criterion.
-- Wiring `nse_reports.snapshot()` into the real CLI paths (Task 1 finding A.7).
-- `universe_definition_id` versioning (Task 14).
-- The full offline-fixture test matrix (Task 10).
+Everything below was "deferred to Task 5+" when this document was first written; each line now
+says what actually happened, so this document stays accurate rather than aspirational:
 
-These are the next commits on this branch, built directly against the evidence and decisions
-recorded above — not a separate re-derivation.
+- **Done:** `eq_etfseclist.csv`/`REITS_L.csv`/`INVITS_L.csv`/`SME_EQUITY_L.csv` fetchers
+  (`data/nse_instrument_lists.py`), wired into `universe/mainboard.py`'s exclusion hook with a
+  non-fatal, per-category failure policy (see that module's docstring) and per-category
+  attribution in diagnostics (`excluded_by_category`).
+- **Done:** `EQUITY_L.csv` promoted to primary source order; the singular/plural URL bug fixed.
+- **Done:** `filter_mainboard_equity` and `MAINBOARD_SERIES_DEDUP_PREFERENCE` extended to include
+  `BZ`. Surfaced a real, useful side effect in the existing test fixture: a same-ISIN-different-
+  symbol row (`SERIESCHANGED`) that used to be silently excluded (BZ was unranked) now correctly
+  demonstrates the known Symbol-vs-ISIN identity limitation with one more example than before.
+- **Done:** cardinality gate re-derived: `[1500, 3500]` (was `[500, 4000]`), around
+  `EQUITY_L.csv`'s real observed 2,585.
+- **Partially done — Task 7's classification field:** implemented as
+  `Exclusion_Category`/`excluded_by_category` on EXCLUDED rows (which category removed them), not
+  as a positive `ordinary_equity | ETF | REIT | InvIT | SME | other` field on every row in the
+  final output — the latter would be redundant for rows that made it into `NSE_MAINBOARD_EQ` (they
+  are, definitionally, `ordinary_equity` by construction) and this project has no reference list
+  for the "other" bucket to classify it further (Part H). Flagged as a considered scope choice,
+  not an oversight.
+- **Done:** `nse_reports.snapshot()` wired into `cli/update_universe.py` for the mainboard path
+  (`NSEMainboardEquityUniverseProvider.build_universe_snapshot()`); NIFTY_200's `build_snapshot()`
+  call is untouched.
+- **Done:** `UniverseSnapshot.source_date`/`snapshot_date_basis`/`universe_definition_id`/
+  `classification_rules_version` (Tasks 8 & 14) — additive fields, `None` by default, so the
+  NIFTY_200 path is unaffected.
+- **Done:** `universe/drift.py` (Task 9) — report-only, never raises; `universe/snapshot_store.py`
+  (Task 8/10) — an append-only history alongside the pre-existing overwrite-only
+  `security_master_latest`/`universe_snapshots` tables (which are retained, since the research
+  CLIs still read `security_master_latest` directly).
+- **Done:** `run_manifest.py`'s `extra` dict now carries `universe_definition_id` for
+  NSE_MAINBOARD_EQ runs (Task 21 acceptance criterion 12); `None`, not fabricated, for NIFTY_200.
+- **Not done, explicitly out of scope for this branch:** enabling mainboard for daily production
+  use (Task 12 requires this to be demonstrated safe first — see the audit's final assessment);
+  live-network verification of the STRONG_INFERENCE ETF/REIT URLs (no network path from this
+  sandbox); a positive sub-classification of the "other" (H) bucket.
