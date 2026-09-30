@@ -134,6 +134,8 @@ SECURITY_FILE_COLUMN_CANDIDATES: dict[str, tuple[str, ...]] = {
 
 SECURITY_FILE_SCHEMA_VERSION = "SECURITY_FILE_COLUMN_CANDIDATES_v1"  # bump if the map above changes
 
+MAINBOARD_EQUITY_SERIES = frozenset({"EQ", "BE", "BZ"})
+
 
 @dataclass(frozen=True)
 class ReportAvailability:
@@ -453,7 +455,7 @@ def filter_mainboard_equity(security_df: pd.DataFrame) -> pd.DataFrame:
     renamed) since `universe/mainboard.py` already imports it directly and renaming would be
     churn with no behavior change; `derive_mainboard` below is a thin alias for pipeline-naming
     consistency with the rest of this module."""
-    return security_df[security_df["Series"].isin(("EQ", "BE", "BZ"))].copy()
+    return security_df[security_df["Series"].isin(MAINBOARD_EQUITY_SERIES)].copy()
 
 
 derive_mainboard = filter_mainboard_equity  # pipeline-stage alias, see docstring above
