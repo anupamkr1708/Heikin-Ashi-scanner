@@ -42,6 +42,7 @@ from nse_scanner.reporting.excel import write_report
 from nse_scanner.reporting.run_manifest import build_run_manifest
 from nse_scanner.reporting.summary import build_summary_sheet
 from nse_scanner.universe.factory import get_universe_provider
+from nse_scanner.universe.mainboard import NSEMainboardEquityUniverseProvider
 
 IST = zoneinfo.ZoneInfo("Asia/Kolkata")
 
@@ -200,6 +201,18 @@ def main(argv: list[str] | None = None) -> int:
             "signals_current": result.signals_current,
             "signals_stale": result.signals_stale,
             "needs_bootstrap": result.needs_bootstrap,
+            # mainboard-universe-integrity-v2 / Task 21 acceptance criterion 12: the manifest must
+            # be able to identify the universe-DEFINITION version, independent of software_version
+            # and strategy_id. Only meaningful for NSE_MAINBOARD_EQ today -- None for NIFTY_200,
+            # which has no such concept (its "definition" is simply whatever the index provider
+            # says) -- explicitly None, not a fabricated id, so a manifest reader can tell the
+            # difference between "not applicable" and "forgot to record it".
+            "universe_definition_id": (
+                universe_provider.last_diagnostics.get("universe_definition_id")
+                if isinstance(universe_provider, NSEMainboardEquityUniverseProvider)
+                and universe_provider.last_diagnostics
+                else None
+            ),
         },
     )
     result.sheets.summary = build_summary_sheet(result, cfg, session, manifest)

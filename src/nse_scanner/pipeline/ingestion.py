@@ -16,7 +16,7 @@ from pathlib import Path
 import pandas as pd
 
 from nse_scanner.data.nse_eod import NseBhavcopyResult, fetch_bhavcopy
-from nse_scanner.data.nse_reports import ReportAvailability, check_bhavcopy_availability
+from nse_scanner.data.nse_reports import MAINBOARD_EQUITY_SERIES, ReportAvailability, check_bhavcopy_availability
 from nse_scanner.data.storage import MarketDataStore
 from nse_scanner.exceptions import DataProviderError
 from nse_scanner.logging_config import get_logger
@@ -87,7 +87,7 @@ def ingest_session(
     keep_cols = [c for c in wanted_cols if c in frame.columns]
     frame = frame[keep_cols]
     if "Series" in frame.columns:
-        frame = frame[frame["Series"].astype(str).str.strip().str.upper().isin(("EQ", "BE"))]
+        frame = frame[frame["Series"].astype(str).str.strip().str.upper().isin(MAINBOARD_EQUITY_SERIES)]
 
     now = datetime.now(timezone.utc)
     normalized = pd.DataFrame(

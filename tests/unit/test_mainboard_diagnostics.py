@@ -28,9 +28,15 @@ def _parsed_fixture_cases():
 
 
 def test_cardinality_funnel_is_internally_consistent_on_the_case_fixture():
-    """11 raw rows: EQ x8, BE x1, BZ x1 (excluded, unranked/not in {EQ,BE}), N1 x1 (excluded,
-    debenture-style series) -> 9 EQ+BE rows -> 1 dropped by dedup (the NORMALEQ BE row, since its
-    EQ counterpart wins) -> 8 final."""
+    """11 raw rows: EQ x8, BE x1, BZ x1, N1 x1 (excluded, debenture-style series) -> 10 EQ+BE+BZ
+    rows (mainboard-universe-integrity-v2: BZ is now included -- NSE's own Legend of Series
+    defines it as a STATUS of an existing mainboard-equity company (Z-category non-compliance),
+    not a separate instrument type, so filter_mainboard_equity's predicate was extended to
+    Series.isin(("EQ","BE","BZ"))) -> 1 dropped by dedup (the NORMALEQ BE row, since its EQ
+    counterpart wins; SERIESCHANGED's BZ row is a DIFFERENT NSE_Symbol from NORMALEQ despite
+    sharing its ISIN, so it is NOT deduped away -- see
+    test_same_isin_different_symbol_is_a_known_limitation_not_silently_deduped, which this
+    change makes an even clearer illustration of, not a new problem) -> 9 final."""
     parsed = _parsed_fixture_cases()
     mainboard = filter_mainboard_equity(parsed)
     kept, dropped = deduplicate_mainboard(mainboard)
@@ -38,11 +44,11 @@ def test_cardinality_funnel_is_internally_consistent_on_the_case_fixture():
 
     assert diag["raw_row_count"] == 11
     assert diag["series_breakdown"] == {"EQ": 8, "BE": 1, "BZ": 1, "N1": 1}
-    assert diag["eq_be_row_count"] == 9  # BZ and N1 excluded by filter_mainboard_equity itself
+    assert diag["eq_be_row_count"] == 10  # only N1 excluded by filter_mainboard_equity itself now
     assert diag["excluded_known_non_equity_count"] == 0  # no exclusion list supplied
     assert diag["dropped_by_dedup_count"] == 1
     assert diag["dedup_reasons"] == {"SERIES_PREFERENCE_EQ_OVER_BE": 1}
-    assert diag["deduplicated_row_count"] == diag["final_constituent_count"] == 8
+    assert diag["deduplicated_row_count"] == diag["final_constituent_count"] == 9
     # funnel must sum correctly end to end
     funnel_result = diag["eq_be_row_count"] - diag["excluded_known_non_equity_count"] - diag["dropped_by_dedup_count"]
     assert funnel_result == diag["final_constituent_count"]

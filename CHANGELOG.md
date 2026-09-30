@@ -1,5 +1,64 @@
 # Changelog
 
+## 1.6.0 — mainboard-universe-integrity-v2: real ETF/REIT/InvIT/SME exclusion, BZ inclusion, provenance/drift
+
+Full findings: `MAINBOARD_UNIVERSE_INTEGRITY_V2_AUDIT.md` (code audit + primary-source forensics)
+and `MAINBOARD_UNIVERSE_SPEC.md` (the formal universe-definition contract this project previously
+lacked). Summary:
+
+- **Bug fixed: the `EQUITY_L.csv` fallback URL was almost certainly wrong.** Used singular
+  `content/equity/EQUITY_L.csv`; four independently-verified real sources (an ISIN-database
+  project, a Medium walkthrough, the `rsquaredacademy/nse2r` R package, and a direct
+  content-identical match for the sibling file `INVITS_L.csv`) all agree on plural
+  `content/equities/...`. Fixed, and promoted to the *primary* NSE_MAINBOARD_EQ source (it is the
+  only one of the three URL templates this project has ever actually verified against real bytes;
+  the CM-MII master has never been successfully fetched in any session).
+- **`BZ` is now included in NSE_MAINBOARD_EQ.** NSE's own official "Legend of Series" (fetched
+  directly from `nseindia.com` this session) confirms it is a *status* of an existing mainboard
+  company (Z-category non-compliance, SEBI circular CIR/MRD/DSA/31/2013) — the same category as
+  `BE`, which was already included, not a separate instrument type. A real copy of `EQUITY_L.csv`
+  confirms all three (EQ/BE/BZ: 2,317/241/27 rows) genuinely co-occur in that exact file.
+- **Real ETF/REIT/InvIT/SME exclusion.** `universe/mainboard.py`'s exclusion hook shipped
+  permanently empty since PR #5 ("no authoritative list has been fetched/verified yet"). Real
+  fetchers for all four now exist (`data/nse_instrument_lists.py`), built and tested against real
+  files supplied this session — NSE's own documentation confirms this cross-reference is
+  structurally necessary (ETFs share `Series=EQ` with ordinary equity), not merely defensive. A
+  category that fails to fetch is non-fatal (recorded as `UNAVAILABLE` in diagnostics) — a
+  deliberately different, less severe policy than a primary-source failure.
+- **Cardinality gate re-derived.** `[500, 4000]` (picked against an unverified CM-MII figure) →
+  `[1500, 3500]`, a documented collar around `EQUITY_L.csv`'s real observed 2,585 rows.
+- **Universe provenance was computed and then discarded.** `nse_reports.snapshot()` (correct
+  source-date handling, full diagnostics) existed and was unit-tested since PR #5 but was never
+  called from either real CLI entry point — `cli/update_universe.py` used a generic snapshot
+  builder that substituted the retrieval timestamp for the source date and dropped diagnostics
+  entirely. Fixed for the mainboard path; NIFTY_200's snapshot construction is untouched.
+- **New: append-only universe snapshot history** (`universe/snapshot_store.py`) — the pre-existing
+  `security_master_latest`/`universe_snapshots` parquet tables are overwritten every run (kept
+  unchanged; still read by research CLIs), so there was no history to diff against. Explicitly
+  *not* claimed as point-in-time reconstruction of an arbitrary past date — only of dates this
+  project actually took a snapshot on.
+- **New: universe drift diagnostics** (`universe/drift.py`) — report-only, never raises on a
+  membership change (expected churn vs. structural corruption is explicitly not the same thing).
+  Includes a probable-rename heuristic (shared ISIN across an added+removed symbol pair).
+- **New: `universe_definition_id`** (`"nse_mainboard_equity_v2"`) and
+  `classification_rules_version`, versioned independently of `software_version` and `strategy_id`;
+  now reaches the run manifest for NSE_MAINBOARD_EQ runs (explicitly `None`, not fabricated, for
+  NIFTY_200, which has no such concept).
+- **38 new tests**, most against real NSE data supplied this session (`tests/fixtures/nse_real_samples/`
+  — full real ETF/REIT/InvIT/SME lists, curated-but-real slices of `EQUITY_L.csv` and a real
+  2026-09-25 bhavcopy), including a full end-to-end pipeline test against that real data together.
+
+**Deliberately not done:** enabling mainboard for daily production use (not yet demonstrated safe
+per Task 12's bar); live-network verification of the ETF/REIT URLs (STRONG_INFERENCE by
+directory-pattern analogy, not independently content-verified — no network path to `nseindia.com`
+from this sandbox); a positive sub-classification of the residual "other" instrument bucket (debt/
+gold bonds/G-Secs/etc.); BB/HA strategy, indicator formulas, NIFTY_200 behavior, optional filters,
+and price-basis architecture are all untouched.
+
+Full validation: ruff check/format clean, mypy clean (82 files), 290/290 tests passed, `git diff
+--check` clean (real CRLF fixture files carved out via `.gitattributes`, not silently converted),
+`python -m build --sdist --wheel --no-isolation` successful, offline-fixture run successful.
+
 ## 1.5.0 — client-reporting-hardening: complete diagnostics, EOD_Summary sheet, version-consistency fix
 
 - **Fixed: application version drift.** `pyproject.toml` declared `version = "1.4.0"` while

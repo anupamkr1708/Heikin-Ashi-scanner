@@ -75,18 +75,23 @@ def test_unranked_series_sorts_after_every_preferred_series_deterministically():
 def test_same_isin_different_symbol_is_a_known_limitation_not_silently_deduped():
     """DUPEISIN_SAMESERIES shares NORMALEQ's ISIN but has a DIFFERENT NSE_Symbol (e.g. a
     corporate-action symbol change where the security master still carries a lingering old-symbol
-    row). Current identity is Symbol-keyed (matching mainboard.py's actual output column), NOT
-    ISIN-keyed -- deduplicate_mainboard must NOT silently merge these, since doing so would be
-    inventing an ISIN-based identity model this patch does not implement (Step 6 remains open).
-    This test documents the limitation rather than hiding it."""
+    row); SERIESCHANGED shares the same ISIN too, under Series='BZ' (mainboard-universe-
+    integrity-v2: now correctly included by filter_mainboard_equity's predicate, which makes this
+    an even clearer illustration of the same limitation, not a new one). Current identity is
+    Symbol-keyed (matching mainboard.py's actual output column), NOT ISIN-keyed --
+    deduplicate_mainboard must NOT silently merge these, since doing so would be inventing an
+    ISIN-based identity model this patch does not implement (Task 4 of
+    MAINBOARD_UNIVERSE_SPEC.md records this as a considered, still-open decision). This test
+    documents the limitation rather than hiding it."""
     mainboard = _mainboard_from_fixture_cases()
     kept, _ = deduplicate_mainboard(mainboard)
 
     normaleq_isin = mainboard[mainboard["NSE_Symbol"] == "NORMALEQ"]["ISIN"].iloc[0]
     same_isin_rows = kept[kept["ISIN"] == normaleq_isin]
-    # BOTH NORMALEQ and DUPEISIN_SAMESERIES survive as separate constituents today -- a real,
-    # open identity-model gap, not a bug this patch silently papers over.
-    assert set(same_isin_rows["NSE_Symbol"]) == {"NORMALEQ", "DUPEISIN_SAMESERIES"}
+    # ALL THREE of NORMALEQ, DUPEISIN_SAMESERIES, and SERIESCHANGED survive as separate
+    # constituents today -- a real, open identity-model gap, not a bug this patch silently papers
+    # over.
+    assert set(same_isin_rows["NSE_Symbol"]) == {"NORMALEQ", "DUPEISIN_SAMESERIES", "SERIESCHANGED"}
 
 
 def test_dedup_is_a_no_op_when_no_symbol_repeats():

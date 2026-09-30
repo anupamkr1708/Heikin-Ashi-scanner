@@ -53,6 +53,58 @@ EOD_PRICES_SCHEMA = (
     "ingested_at",
 )
 
+EOD_STRING_COLUMNS = (
+    "nse_symbol",
+    "isin",
+    "source",
+    "price_basis",
+    "schema_version",
+)
+
+EOD_FLOAT_COLUMNS = (
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "turnover",
+)
+
+
+def _normalize_eod_schema(df: pd.DataFrame) -> pd.DataFrame:
+    missing = [c for c in EOD_PRICES_SCHEMA if c not in df.columns]
+    if missing:
+        raise StorageError(f"append_eod_prices: missing columns {missing}")
+
+    out = df[list(EOD_PRICES_SCHEMA)].copy()
+
+    out["nse_symbol"] = out["nse_symbol"].astype("string").str.strip().str.upper()
+
+    out["isin"] = out["isin"].astype("string").str.strip()
+
+    out["trade_date"] = pd.to_datetime(
+        out["trade_date"],
+        errors="raise",
+    )
+
+    for column in EOD_FLOAT_COLUMNS:
+        out[column] = pd.to_numeric(
+            out[column],
+            errors="raise",
+        ).astype("float64")
+
+    for column in EOD_STRING_COLUMNS:
+        out[column] = out[column].astype("string")
+
+    out["ingested_at"] = pd.to_datetime(
+        out["ingested_at"],
+        utc=True,
+        errors="raise",
+    )
+
+    return out
+
+
 PRICE_BASIS_RAW = "RAW"
 PRICE_BASIS_ADJUSTED = "ADJUSTED"
 PRICE_BASIS_BLENDED = "BLENDED_RAW_NSE_ADJUSTED_YFINANCE_BOOTSTRAP"
@@ -96,8 +148,7 @@ class MarketDataStore:
         if missing:
             raise StorageError(f"append_eod_prices: missing columns {missing}")
 
-        incoming = df[list(EOD_PRICES_SCHEMA)].copy()
-        incoming["trade_date"] = pd.to_datetime(incoming["trade_date"])
+        incoming = _normalize_eod_schema(df)
         incoming["_year"] = incoming["trade_date"].dt.year
 
         for year, year_df in incoming.groupby("_year"):
@@ -105,9 +156,11 @@ class MarketDataStore:
             partition_path = self._partition_path(int(year))
             if partition_path.exists():
                 existing = pd.read_parquet(partition_path)
+                existing = _normalize_eod_schema(existing)
                 combined = pd.concat([existing, year_df], ignore_index=True)
             else:
                 combined = year_df
+            combined = _normalize_eod_schema(combined)
             combined = combined.drop_duplicates(subset=["nse_symbol", "trade_date", "source"], keep="last")
             combined = combined.sort_values(["nse_symbol", "trade_date"])
             combined.to_parquet(partition_path, index=False)
